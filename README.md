@@ -88,6 +88,8 @@ pnpm dev
 - REST API Server: `http://localhost:4000`
 - Swagger Documentation: `http://localhost:4000/docs`
 
+<!-- Howdy -->
+
 ---
 
 ## Developer Demo Credentials
