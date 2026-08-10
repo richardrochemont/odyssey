@@ -3,6 +3,8 @@ import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import * as dotenv from "dotenv";
+import { sql } from "drizzle-orm";
+import { db } from "@hearthlane/db";
 
 // Load environment variables
 dotenv.config({ path: "../../.env" });
@@ -33,8 +35,12 @@ async function startServer() {
   });
 
   // CORS Configuration
+  // CORS_ORIGIN accepts a comma-separated allowlist (e.g. "https://app.example.com,https://staging.example.com").
+  // Left unset, all origins are reflected — matches prior behavior, but should be set explicitly once the
+  // production web app URL is known.
+  const corsOrigin = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim()).filter(Boolean);
   await app.register(cors, {
-    origin: true, // allow all origins in development
+    origin: corsOrigin && corsOrigin.length > 0 ? corsOrigin : true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   });
@@ -98,9 +104,23 @@ async function startServer() {
   await app.register(aiRoutes, { prefix: "/ai" });
   await app.register(paymentRoutes, { prefix: "/payments" });
 
-  // Simple Health Check
+  // Liveness check — process is up, does not verify dependencies
   app.get("/health", async () => {
     return { status: "healthy", timestamp: new Date().toISOString() };
+  });
+
+  // Readiness check — verifies the database is actually reachable
+  app.get("/health/db", async (_request, reply) => {
+    try {
+      await db.execute(sql`select 1`);
+      return { status: "healthy", timestamp: new Date().toISOString() };
+    } catch (error) {
+      app.log.error(error);
+      return reply.code(503).send({
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   try {

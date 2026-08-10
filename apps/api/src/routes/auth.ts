@@ -9,17 +9,36 @@ function hashPassword(password: string): string {
   return createHash("sha256").update(password).digest("hex");
 }
 
+// Unauthenticated user-directory endpoint powering the "Local Developer Auth" picker on the login
+// screen. Defaults to enabled to preserve current behavior (no real auth provider is wired up yet —
+// see docs/railway-notes.md). Set ENABLE_DEV_AUTH_DIRECTORY=false once real tenant/financial data is
+// in this environment: as-is, anyone can enumerate every user's name/email/role with no credentials.
+const DEV_AUTH_DIRECTORY_ENABLED = process.env.ENABLE_DEV_AUTH_DIRECTORY !== "false";
+
+if (DEV_AUTH_DIRECTORY_ENABLED && process.env.NODE_ENV === "production") {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[SECURITY WARNING] GET /auth/users is enabled in production — this endpoint lists every " +
+    "user's name/email/role with no authentication. Set ENABLE_DEV_AUTH_DIRECTORY=false once this " +
+    "environment holds real tenant/financial data."
+  );
+}
+
 export default async function authRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
-  
+
   // Endpoint to discover seeded users for dev selector
-  fastify.get("/users", async (_request, _reply) => {
+  fastify.get("/users", async (_request, reply) => {
+    if (!DEV_AUTH_DIRECTORY_ENABLED) {
+      return reply.code(404).send({ error: "Not found" });
+    }
+
     const list = await db.select({
       id: users.id,
       name: users.name,
       email: users.email,
       role: users.role,
     }).from(users);
-    
+
     return list;
   });
 

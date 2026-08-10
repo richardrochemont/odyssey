@@ -1,6 +1,15 @@
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "local-development-secret-jwt-key-change-in-production";
+const FALLBACK_JWT_SECRET = "local-development-secret-jwt-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET || FALLBACK_JWT_SECRET;
+
+if (JWT_SECRET === FALLBACK_JWT_SECRET && process.env.NODE_ENV === "production") {
+  // eslint-disable-next-line no-console
+  console.error(
+    "[SECURITY WARNING] JWT_SECRET is not set — signing tokens with the public fallback secret. " +
+    "Anyone can forge valid session tokens. Set JWT_SECRET in this environment immediately."
+  );
+}
 
 export interface UserSessionPayload {
   id: string;
