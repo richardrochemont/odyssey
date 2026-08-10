@@ -106,7 +106,6 @@ A local selector is available on the `/login` screen. Select any user to login w
 ### 1. Clerk Authentication
 
 To transition from local dev JWT auth to Clerk:
-<!--  -->
 
 - Install `@clerk/nextjs` in `apps/web` and `@clerk/fastify` in `apps/api`.
 - Swap the custom context provider in `apps/web/src/context/auth-context.tsx` with Clerk's `<ClerkProvider>`.
