@@ -1,0 +1,25 @@
+{
+  "name": "@hearthlane/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "~50.0.14",
+    "expo-router": "~3.4.8",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-web": "~0.19.6"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@hearthlane/tsconfig": "workspace:*",
+    "@types/react": "~18.2.45",
+    "typescript": "^5.4.5"
+  }
+}
