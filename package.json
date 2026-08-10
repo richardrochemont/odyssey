@@ -4,6 +4,9 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "start:web": "pnpm --filter @hearthlane/web run start",
+    "start:api": "pnpm --filter @hearthlane/api run start",
+    "start": "pnpm --filter @hearthlane/web run start",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""

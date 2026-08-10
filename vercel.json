@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "rootDirectory": "apps/web",
+  "buildCommand": "pnpm --filter @hearthlane/web run build",
+  "installCommand": "pnpm install"
+}
