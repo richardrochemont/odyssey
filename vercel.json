@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "buildCommand": "pnpm install && pnpm --filter @hearthlane/web run build",
+  "rootDirectory": "apps/web",
   "installCommand": "pnpm install",
-  "outputDirectory": "apps/web/.next"
+  "buildCommand": "pnpm --filter @hearthlane/web run build"
 }
