@@ -1,8 +1,11 @@
 {
   "version": 3,
-  "rootDirectory": "apps/web",
   "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @hearthlane/web run build",
-  "outputDirectory": ".next",
-  "framework": "nextjs"
+  "builds": [
+    {
+      "src": "apps/web/package.json",
+      "use": "@vercel/next"
+    }
+  ]
 }
