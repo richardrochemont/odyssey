@@ -2,5 +2,7 @@
   "version": 3,
   "rootDirectory": "apps/web",
   "installCommand": "pnpm install",
-  "buildCommand": "pnpm --filter @hearthlane/web run build"
+  "buildCommand": "pnpm --filter @hearthlane/web run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs"
 }
