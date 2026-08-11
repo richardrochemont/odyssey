@@ -6,6 +6,8 @@ Odyssey is an intelligent portfolio operating system for self-managing residenti
 
 The project is structured as a TypeScript monorepo using **pnpm workspaces** and **Turborepo** for parallel build and execution execution.
 
+<!-- Please work -->
+
 ```
 ├── apps
 │   ├── api          # Fastify REST API, OpenAPI docs, domain-services
