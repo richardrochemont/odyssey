@@ -15,6 +15,8 @@ import {
   LogOut,
   User,
   ShieldCheck,
+  Upload,
+  RefreshCw,
 } from "lucide-react";
 import AssistantPanel from "./AssistantPanel";
 
@@ -60,6 +62,18 @@ export default function Sidebar() {
       name: "Expenses",
       href: "/expenses",
       icon: Receipt,
+      roles: ["owner", "manager", "read_only"],
+    },
+    {
+      name: "Import",
+      href: "/import",
+      icon: Upload,
+      roles: ["owner", "manager"],
+    },
+    {
+      name: "Reconciliation",
+      href: "/reconciliation",
+      icon: RefreshCw,
       roles: ["owner", "manager", "read_only"],
     },
     {

@@ -1,7 +1,7 @@
-import { db, financialRecords, leases, properties, units, payments } from "@hearthlane/db";
+import { db, financialRecords, leases, properties, units, charges, paymentAllocations } from "@odyssey/db";
 import { and, eq, isNull, gte, lte } from "drizzle-orm";
 import { logAction } from "./audit";
-import { FinancialRecordCreateInput } from "@hearthlane/validation";
+import { FinancialRecordCreateInput } from "@odyssey/validation";
 
 export async function listFinancialRecords(orgId: string) {
   return db.select({
@@ -32,11 +32,14 @@ export async function createFinancialRecord(orgId: string, userId: string, input
     orgId,
     propertyId: input.propertyId,
     unitId: input.unitId || null,
-    type: "expense", // enforce expense type for Odyssey
+    type: "expense",
     amount: Math.round(input.amount * 100), // convert dollars to cents
     date: new Date(input.date),
     category: input.category,
     notes: input.notes || null,
+    vendorId: input.vendorId || null,
+    sourceTransactionRef: input.sourceTransactionRef || null,
+    state: input.state || "approved",
   }).returning();
 
   await logAction({
@@ -79,6 +82,7 @@ export async function archiveFinancialRecord(orgId: string, userId: string, id: 
 export interface PortfolioSummary {
   scheduledRent: number; // in cents
   recordedRent: number;  // in cents
+  outstandingRent: number; // in cents
   totalIncome: number;   // in cents
   totalExpenses: number; // in cents
   netOperatingIncome: number; // in cents
@@ -93,36 +97,34 @@ export async function getPortfolioFinancialSummary(
   const start = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
   const end = endDate || new Date();
 
-  // 1. Calculate scheduled rent from active leases
-  const activeLeases = await db.select({
-    monthlyRent: leases.monthlyRent,
-  })
-  .from(leases)
-  .where(and(
-    eq(leases.orgId, orgId),
-    eq(leases.status, "active"),
-    isNull(leases.archivedAt)
-  ));
-
-  const scheduledRent = activeLeases.reduce((sum, l) => sum + l.monthlyRent, 0);
-
-  // 2. Fetch payments in range to compute recorded collected rent
-  const rangePayments = await db.select()
-    .from(payments)
+  // 1. Scheduled Rent (obligation billed amount from charges)
+  const chargeRecords = await db.select()
+    .from(charges)
     .where(and(
-      eq(payments.orgId, orgId),
-      gte(payments.dueDate, start),
-      lte(payments.dueDate, end),
-      isNull(payments.archivedAt)
+      eq(charges.orgId, orgId),
+      gte(charges.dueDate, start),
+      lte(charges.dueDate, end),
+      isNull(charges.archivedAt)
     ));
+  const scheduledRent = chargeRecords.reduce((sum, c) => sum + c.amount, 0);
 
-  let collectedRent = 0;
-  for (const p of rangePayments) {
-    collectedRent += p.amountReceived;
-  }
+  // 2. Collected Rent (payment allocations matched to charges in timeframe)
+  const allocations = await db.select({ amount: paymentAllocations.amount })
+    .from(paymentAllocations)
+    .innerJoin(charges, eq(paymentAllocations.chargeId, charges.id))
+    .where(and(
+      eq(charges.orgId, orgId),
+      gte(charges.dueDate, start),
+      lte(charges.dueDate, end),
+      isNull(charges.archivedAt)
+    ));
+  const collectedRent = allocations.reduce((sum, a) => sum + a.amount, 0);
 
-  // 3. Fetch all expenses in range
-  const records = await db.select()
+  // 3. Outstanding Rent Balance
+  const outstandingRent = chargeRecords.reduce((sum, c) => sum + c.balance, 0);
+
+  // 4. Expenses (Avoiding double counting historical summaries if transactions exist)
+  const allExpenses = await db.select()
     .from(financialRecords)
     .where(and(
       eq(financialRecords.orgId, orgId),
@@ -132,13 +134,25 @@ export async function getPortfolioFinancialSummary(
       isNull(financialRecords.archivedAt)
     ));
 
-  const totalExpenses = records.reduce((sum, r) => sum + r.amount, 0);
+  // Partition expenses into transaction-level vs summary-level
+  const transactionExpenses = allExpenses.filter(e => !e.notes?.startsWith("[Historical Summary]"));
+  const summaryExpenses = allExpenses.filter(e => e.notes?.startsWith("[Historical Summary]"));
+
+  // Check if we have any transaction-level records
+  let totalExpenses = 0;
+  if (transactionExpenses.length > 0) {
+    totalExpenses = transactionExpenses.reduce((sum, e) => sum + e.amount, 0);
+  } else {
+    totalExpenses = summaryExpenses.reduce((sum, e) => sum + e.amount, 0);
+  }
+
   const totalIncome = collectedRent;
   const netOperatingIncome = totalIncome - totalExpenses;
 
   return {
     scheduledRent,
     recordedRent: collectedRent,
+    outstandingRent,
     totalIncome,
     totalExpenses,
     netOperatingIncome,
@@ -159,12 +173,16 @@ export async function getPortfolioCashFlowTrends(orgId: string) {
   .from(leases)
   .where(and(eq(leases.orgId, orgId), eq(leases.status, "active"), isNull(leases.archivedAt)));
 
-  // Fetch all payments (to get collected rent)
-  const allPayments = await db.select()
-    .from(payments)
-    .where(and(eq(payments.orgId, orgId), isNull(payments.archivedAt)));
+  // Fetch all payment allocations
+  const allAllocations = await db.select({
+    amount: paymentAllocations.amount,
+    dueDate: charges.dueDate,
+  })
+  .from(paymentAllocations)
+  .innerJoin(charges, eq(paymentAllocations.chargeId, charges.id))
+  .where(and(eq(charges.orgId, orgId), isNull(charges.archivedAt)));
 
-  // Fetch all expenses (financial records with type = expense)
+  // Fetch all expenses
   const allExpenses = await db.select()
     .from(financialRecords)
     .where(and(eq(financialRecords.orgId, orgId), eq(financialRecords.type, "expense"), isNull(financialRecords.archivedAt)));
@@ -177,13 +195,13 @@ export async function getPortfolioCashFlowTrends(orgId: string) {
     const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
     const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
 
-    // Collected Rent (actual received in this month)
-    const collected = allPayments
-      .filter((p) => {
-        const d = new Date(p.dueDate);
+    // Collected Rent (actual received allocation due in this month)
+    const collected = allAllocations
+      .filter((a) => {
+        const d = new Date(a.dueDate);
         return d >= startOfMonth && d <= endOfMonth;
       })
-      .reduce((sum, p) => sum + p.amountReceived, 0);
+      .reduce((sum, a) => sum + a.amount, 0);
 
     // Projected Rent (scheduled rent based on active leases for this month)
     const projected = activeLeases
@@ -194,18 +212,25 @@ export async function getPortfolioCashFlowTrends(orgId: string) {
       })
       .reduce((sum, l) => sum + l.monthlyRent, 0);
 
-    // Recorded Expenses
-    const recordedExp = allExpenses
-      .filter((e) => {
-        const d = new Date(e.date);
-        return d >= startOfMonth && d <= endOfMonth;
-      })
-      .reduce((sum, e) => sum + e.amount, 0);
+    // Filter expenses in month
+    const monthExpenses = allExpenses.filter((e) => {
+      const d = new Date(e.date);
+      return d >= startOfMonth && d <= endOfMonth;
+    });
+
+    const txExpenses = monthExpenses.filter(e => !e.notes?.startsWith("[Historical Summary]"));
+    const sumExpenses = monthExpenses.filter(e => e.notes?.startsWith("[Historical Summary]"));
+
+    let finalExpenses = 0;
+    if (txExpenses.length > 0) {
+      finalExpenses = txExpenses.reduce((sum, e) => sum + e.amount, 0);
+    } else {
+      finalExpenses = sumExpenses.reduce((sum, e) => sum + e.amount, 0);
+    }
 
     // Projected Expenses for future months
-    let finalExpenses = recordedExp;
-    if (monthOffset > 0) {
-      const pastExpenses = allExpenses.filter((e) => new Date(e.date) < now);
+    if (monthOffset > 0 && finalExpenses === 0) {
+      const pastExpenses = allExpenses.filter((e) => new Date(e.date) < now && !e.notes?.startsWith("[Historical Summary]"));
       const avgPast = pastExpenses.length > 0 
         ? Math.round(pastExpenses.reduce((sum, e) => sum + e.amount, 0) / 6) 
         : 0;

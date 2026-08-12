@@ -1,7 +1,7 @@
-import { db, maintenanceRequests, workOrders, vendors, properties, units, tenants } from "@hearthlane/db";
+import { db, maintenanceRequests, workOrders, vendors, properties, units, tenants } from "@odyssey/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { logAction } from "./audit";
-import { MaintenanceRequestCreateInput, WorkOrderCreateInput, VendorCreateInput, MaintenanceStatus, WorkOrderStatus } from "@hearthlane/validation";
+import { MaintenanceRequestCreateInput, WorkOrderCreateInput, VendorCreateInput, MaintenanceStatus, WorkOrderStatus } from "@odyssey/validation";
 
 // Vendors
 export async function listVendors(orgId: string) {

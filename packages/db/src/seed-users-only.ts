@@ -6,7 +6,7 @@ import * as schema from "./schema";
 
 dotenv.config({ path: "../../.env" });
 
-const databaseUrl = process.env.DATABASE_URL || "postgres://postgres:password@localhost:5432/hearthlane";
+const databaseUrl = process.env.DATABASE_URL || "postgres://postgres:password@localhost:5432/odyssey";
 
 function hashPassword(password: string): string {
   return createHash("sha256").update(password).digest("hex");
@@ -19,6 +19,11 @@ async function main() {
 
   // Clear existing data
   console.log("Clearing existing data...");
+  await db.delete(schema.paymentAllocations);
+  await db.delete(schema.charges);
+  await db.delete(schema.importRows);
+  await db.delete(schema.importRuns);
+  await db.delete(schema.importSources);
   await db.delete(schema.auditLogs);
   await db.delete(schema.payments);
   await db.delete(schema.financialRecords);

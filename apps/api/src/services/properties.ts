@@ -1,7 +1,7 @@
-import { db, properties, buildings, units } from "@hearthlane/db";
+import { db, properties, buildings, units } from "@odyssey/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { logAction } from "./audit";
-import { PropertyCreateInput, BuildingCreateInput, UnitCreateInput } from "@hearthlane/validation";
+import { PropertyCreateInput, BuildingCreateInput, UnitCreateInput } from "@odyssey/validation";
 
 export async function listProperties(orgId: string) {
   const props = await db.select()

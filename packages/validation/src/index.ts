@@ -208,6 +208,9 @@ export const FinancialRecordCreateSchema = z.object({
   date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid record date"),
   category: FinancialCategoryEnum,
   notes: z.string().optional(),
+  vendorId: z.string().uuid("Invalid vendor ID").optional().nullable(),
+  sourceTransactionRef: z.string().optional().nullable(),
+  state: z.enum(["approved", "review"]).default("approved"),
 });
 export type FinancialRecordCreateInput = z.infer<typeof FinancialRecordCreateSchema>;
 
@@ -217,12 +220,57 @@ export const PaymentCreateSchema = z.object({
   leaseId: z.string().uuid("Invalid lease ID"),
   propertyId: z.string().uuid("Invalid property ID"),
   unitId: z.string().uuid("Invalid unit ID"),
-  amountDue: z.number().min(0.01, "Amount due must be positive"), // in dollars
+  amountDue: z.number().min(0, "Amount due must be positive").default(0), // in dollars
   amountReceived: z.number().min(0, "Amount received must be non-negative").default(0), // in dollars
-  dueDate: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid due date"),
+  dueDate: z.string().optional().nullable().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid due date"),
   paidDate: z.string().optional().nullable().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid paid date"),
-  status: PaymentStatusEnum.default("upcoming"),
+  status: z.string().default("upcoming"),
   paymentMethod: z.string().optional().nullable(),
   memo: z.string().optional().nullable(),
+  providerId: z.string().optional().nullable(),
+  source: z.enum(["manual", "imported", "provider"]).default("manual"),
+  idempotencyKey: z.string().optional().nullable(),
 });
 export type PaymentCreateInput = z.infer<typeof PaymentCreateSchema>;
+
+// Charge
+export const ChargeStatusEnum = z.enum(["upcoming", "paid", "partial", "overdue", "waived", "void"]);
+export type ChargeStatus = z.infer<typeof ChargeStatusEnum>;
+
+export const ChargeCreateSchema = z.object({
+  leaseId: z.string().uuid("Invalid lease ID"),
+  tenantId: z.string().uuid("Invalid tenant ID"),
+  propertyId: z.string().uuid("Invalid property ID"),
+  unitId: z.string().uuid("Invalid unit ID"),
+  type: z.enum(["rent", "fee", "credit", "adjustment"]),
+  amount: z.number().min(0.01, "Amount must be positive"), // in dollars
+  dueDate: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid due date"),
+  balance: z.number().min(0, "Balance must be non-negative").optional(),
+  status: ChargeStatusEnum.default("upcoming"),
+  notes: z.string().optional().nullable(),
+});
+export type ChargeCreateInput = z.infer<typeof ChargeCreateSchema>;
+
+// Payment Allocation
+export const PaymentAllocationCreateSchema = z.object({
+  paymentId: z.string().uuid("Invalid payment ID"),
+  chargeId: z.string().uuid("Invalid charge ID"),
+  amount: z.number().min(0.01, "Allocation amount must be positive"), // in dollars
+});
+export type PaymentAllocationCreateInput = z.infer<typeof PaymentAllocationCreateSchema>;
+
+// Import Source
+export const ImportSourceCreateSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  type: z.enum(["csv_upload", "bank_feed"]),
+});
+export type ImportSourceCreateInput = z.infer<typeof ImportSourceCreateSchema>;
+
+// Import Run
+export const ImportRunCreateSchema = z.object({
+  sourceId: z.string().uuid("Invalid source ID"),
+  fileName: z.string().min(1, "File name is required"),
+  importType: z.enum(["properties", "units", "tenants", "leases", "payments", "expenses", "transactions"]),
+  status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
+});
+export type ImportRunCreateInput = z.infer<typeof ImportRunCreateSchema>;

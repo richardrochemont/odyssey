@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { authenticate, authorize } from "../middleware/auth";
 import * as service from "../services/leases";
-import { LeaseCreateSchema, LeaseCreateBaseSchema, TenantCreateSchema } from "@hearthlane/validation";
+import { LeaseCreateSchema, LeaseCreateBaseSchema, TenantCreateSchema } from "@odyssey/validation";
 
 export default async function leaseRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
   fastify.addHook("preHandler", authenticate);

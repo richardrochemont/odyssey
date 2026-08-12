@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { db, users, organizations } from "@hearthlane/db";
+import { db, users, organizations } from "@odyssey/db";
 import { eq } from "drizzle-orm";
 import { generateToken } from "../services/auth";
-import { UserSignInSchema, UserSignUpSchema } from "@hearthlane/validation";
+import { UserSignInSchema, UserSignUpSchema } from "@odyssey/validation";
 import { createHash } from "node:crypto";
 
 function hashPassword(password: string): string {

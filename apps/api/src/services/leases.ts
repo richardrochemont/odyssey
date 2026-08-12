@@ -1,7 +1,7 @@
-import { db, leases, tenants, units, tasks, properties } from "@hearthlane/db";
+import { db, leases, tenants, units, tasks, properties } from "@odyssey/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { logAction } from "./audit";
-import { LeaseCreateInput, TenantCreateInput } from "@hearthlane/validation";
+import { LeaseCreateInput, TenantCreateInput } from "@odyssey/validation";
 
 // Tenants
 export async function listTenants(orgId: string) {

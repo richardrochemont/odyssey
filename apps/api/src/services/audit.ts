@@ -1,11 +1,11 @@
-import { db, auditLogs } from "@hearthlane/db";
+import { db, auditLogs } from "@odyssey/db";
 
 export interface CreateAuditLogParams {
   orgId: string;
   userId: string;
   entityType: string;
   entityId: string;
-  action: "create" | "update" | "archive" | "status_transition";
+  action: "create" | "update" | "archive" | "status_transition" | "invite_portal" | "activate_portal" | "webhook_callback";
   previousState?: Record<string, any> | null;
   newState?: Record<string, any> | null;
 }

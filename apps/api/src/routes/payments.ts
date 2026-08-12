@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { authenticate, authorize } from "../middleware/auth";
 import * as service from "../services/payments";
-import { PaymentCreateSchema } from "@hearthlane/validation";
+import { PaymentCreateSchema } from "@odyssey/validation";
 
 export default async function paymentRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
   fastify.addHook("preHandler", authenticate);

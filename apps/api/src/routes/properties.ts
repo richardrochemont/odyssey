@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { authenticate, authorize } from "../middleware/auth";
 import * as service from "../services/properties";
-import { PropertyCreateSchema, BuildingCreateSchema, UnitCreateSchema } from "@hearthlane/validation";
+import { PropertyCreateSchema, BuildingCreateSchema, UnitCreateSchema } from "@odyssey/validation";
 
 export default async function propertyRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
   // Apply authenticate middleware to all routes in this plugin

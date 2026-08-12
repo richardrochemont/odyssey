@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { promptAI } from "./ai";
 
 // Mock the DB module
-vi.mock("@hearthlane/db", () => {
+vi.mock("@odyssey/db", () => {
   const mockProperties = [
     { id: "prop-1", nickname: "Oakridge Manor", address: "128 Oakridge Ave", orgId: "org-1" }
   ];

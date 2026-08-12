@@ -1,7 +1,7 @@
 import { Worker, Job } from "bullmq";
 import IORedis from "ioredis";
 import * as dotenv from "dotenv";
-import { db, leases, tenants, units, tasks, properties, users } from "@hearthlane/db";
+import { db, leases, tenants, units, tasks, properties, users } from "@odyssey/db";
 import { and, eq, isNull } from "drizzle-orm";
 
 // Load env

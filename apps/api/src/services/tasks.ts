@@ -1,7 +1,7 @@
-import { db, tasks, users, properties, units, tenants } from "@hearthlane/db";
+import { db, tasks, users, properties, units, tenants } from "@odyssey/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { logAction } from "./audit";
-import { TaskCreateInput, TaskStatus } from "@hearthlane/validation";
+import { TaskCreateInput, TaskStatus } from "@odyssey/validation";
 
 export interface TaskFilters {
   status?: TaskStatus;

@@ -1,5 +1,5 @@
 {
-  "name": "@hearthlane/web",
+  "name": "@odyssey/web",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@hearthlane/validation": "workspace:*",
+    "@odyssey/validation": "workspace:*",
     "@tanstack/react-query": "^5.29.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -20,7 +20,7 @@
     "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
-    "@hearthlane/tsconfig": "workspace:*",
+    "@odyssey/tsconfig": "workspace:*",
     "@playwright/test": "^1.41.2",
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.3",

@@ -4,7 +4,8 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import * as dotenv from "dotenv";
 import { sql } from "drizzle-orm";
-import { db } from "@hearthlane/db";
+import { db } from "@odyssey/db";
+import IORedis from "ioredis";
 
 // Load environment variables
 dotenv.config({ path: "../../.env" });
@@ -18,8 +19,13 @@ import taskRoutes from "./routes/tasks";
 import financialRoutes from "./routes/financials";
 import aiRoutes from "./routes/ai";
 import paymentRoutes from "./routes/payments";
+import importRoutes from "./routes/imports";
+import webhookRoutes from "./routes/webhooks";
+import portalRoutes from "./routes/portal";
 
 const PORT = parseInt(process.env.PORT || "4000", 10);
+const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const redis = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
 
 async function startServer() {
   const app = fastify({
@@ -35,9 +41,6 @@ async function startServer() {
   });
 
   // CORS Configuration
-  // CORS_ORIGIN accepts a comma-separated allowlist (e.g. "https://app.example.com,https://staging.example.com").
-  // Left unset, all origins are reflected — matches prior behavior, but should be set explicitly once the
-  // production web app URL is known.
   const corsOrigin = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim()).filter(Boolean);
   await app.register(cors, {
     origin: corsOrigin && corsOrigin.length > 0 ? corsOrigin : true,
@@ -49,7 +52,7 @@ async function startServer() {
   await app.register(swagger, {
     swagger: {
       info: {
-        title: "Hearthlane REST API",
+        title: "Odyssey REST API",
         description: "Production-minded backend cockpit for residential landlords",
         version: "1.0.0",
       },
@@ -78,8 +81,6 @@ async function startServer() {
   // Global Error Handler
   app.setErrorHandler((error, _request, reply) => {
     app.log.error(error);
-    
-    // Check if validation error
     if (error.validation) {
       return reply.code(400).send({
         error: "Validation failed",
@@ -87,7 +88,6 @@ async function startServer() {
         details: error.validation,
       });
     }
-
     return reply.code(error.statusCode || 500).send({
       error: error.name || "InternalServerError",
       message: error.message || "An unexpected error occurred",
@@ -103,24 +103,46 @@ async function startServer() {
   await app.register(financialRoutes, { prefix: "/financials" });
   await app.register(aiRoutes, { prefix: "/ai" });
   await app.register(paymentRoutes, { prefix: "/payments" });
+  await app.register(importRoutes, { prefix: "/imports" });
+  await app.register(webhookRoutes, { prefix: "/webhooks" });
+  await app.register(portalRoutes, { prefix: "/portal" });
 
-  // Liveness check — process is up, does not verify dependencies
-  app.get("/health", async () => {
-    return { status: "healthy", timestamp: new Date().toISOString() };
-  });
+  // Upgraded production-safe health check verifying api, database, and redis
+  app.get("/health", async (_request, reply) => {
+    const checks: Record<string, string> = {
+      api: "healthy",
+      database: "unknown",
+      redis: "unknown",
+    };
 
-  // Readiness check — verifies the database is actually reachable
-  app.get("/health/db", async (_request, reply) => {
+    let isHealthy = true;
+
+    // Verify DB
     try {
       await db.execute(sql`select 1`);
-      return { status: "healthy", timestamp: new Date().toISOString() };
-    } catch (error) {
-      app.log.error(error);
-      return reply.code(503).send({
-        status: "unhealthy",
-        timestamp: new Date().toISOString(),
-      });
+      checks.database = "healthy";
+    } catch (e: any) {
+      checks.database = "unhealthy";
+      isHealthy = false;
+      app.log.error(`HealthCheck Database failure: ${e.message}`);
     }
+
+    // Verify Redis
+    try {
+      const ping = await redis.ping();
+      checks.redis = ping === "PONG" ? "healthy" : "unhealthy";
+      if (ping !== "PONG") isHealthy = false;
+    } catch (e: any) {
+      checks.redis = "unhealthy";
+      isHealthy = false;
+      app.log.error(`HealthCheck Redis failure: ${e.message}`);
+    }
+
+    if (!isHealthy) {
+      return reply.code(503).send({ status: "unhealthy", timestamp: new Date().toISOString(), checks });
+    }
+
+    return { status: "healthy", timestamp: new Date().toISOString(), checks };
   });
 
   try {

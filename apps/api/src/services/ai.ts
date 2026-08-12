@@ -1,4 +1,4 @@
-import { db, properties, tenants, leases, units, payments } from "@hearthlane/db";
+import { db, properties, tenants, leases, units, payments } from "@odyssey/db";
 import { and, eq, isNull } from "drizzle-orm";
 
 export interface AIIntentCard {

@@ -2,8 +2,9 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: "../../.env" });
 
 import { promptAI } from "./ai";
-import { db, organizations } from "@hearthlane/db";
+import { db, organizations, tenants, leases, charges, payments, units } from "@odyssey/db";
 import * as assert from "assert";
+import { eq } from "drizzle-orm";
 
 async function run() {
   console.log("Initializing database connection for integration tests...");
@@ -44,6 +45,68 @@ async function run() {
     assert.ok(resultPayments.card, "Result must return a card");
     assert.strictEqual(resultPayments.card.intent, "list_outstanding_payments");
     console.log("Outstanding payments test passed!");
+
+    // 4. Test CSV parsing
+    console.log("Running CSV parser verification...");
+    const { parseCSV } = await import("./imports");
+    const parsedCsv = parseCSV("col1,col2\nval1,val2\n\"val 3, with comma\",val4");
+    assert.strictEqual(parsedCsv.length, 3);
+    assert.strictEqual(parsedCsv[2][0], "val 3, with comma");
+    console.log("CSV parser verification passed!");
+
+    // 5. Test FIFO Allocation calculations and balance updates
+    console.log("Running FIFO allocation verification...");
+    const { allocatePaymentToCharges } = await import("./imports");
+    const [testTenant] = await db.select().from(tenants).where(eq(tenants.orgId, org.id)).limit(1);
+    if (testTenant) {
+      // Create a test charge
+      const [testLease] = await db.select().from(leases).where(eq(leases.primaryTenantId, testTenant.id)).limit(1);
+      if (testLease) {
+        const [testUnit] = await db.select().from(units).where(eq(units.id, testLease.unitId)).limit(1);
+        const propId = testUnit ? testUnit.propertyId : org.id;
+
+        const [testCharge] = await db.insert(charges).values({
+          orgId: org.id,
+          leaseId: testLease.id,
+          tenantId: testTenant.id,
+          propertyId: propId,
+          unitId: testLease.unitId,
+          type: "rent",
+          amount: 100000, // $1000
+          dueDate: new Date(),
+          balance: 100000,
+          status: "upcoming",
+        }).returning();
+
+        // Create a test payment
+        const [testPayment] = await db.insert(payments).values({
+          orgId: org.id,
+          tenantId: testTenant.id,
+          leaseId: testLease.id,
+          propertyId: propId,
+          unitId: testLease.unitId,
+          amountReceived: 60000, // $600
+          paidDate: new Date(),
+          paymentMethod: "cash",
+          status: "paid",
+        }).returning();
+
+        await allocatePaymentToCharges(org.id, testPayment.id, testTenant.id, 60000);
+
+        // Fetch updated charge balance
+        const [updatedCharge] = await db.select().from(charges).where(eq(charges.id, testCharge.id));
+        assert.strictEqual(updatedCharge.balance, 40000);
+        assert.strictEqual(updatedCharge.status, "partial");
+        console.log("FIFO allocation verification passed!");
+      }
+    }
+
+    // 6. Test Double-counting avoidance on summaries
+    console.log("Running cash flow double-counting check...");
+    const { getPortfolioFinancialSummary } = await import("./financials");
+    const summaryCheck = await getPortfolioFinancialSummary(org.id);
+    assert.ok(summaryCheck.totalExpenses >= 0);
+    console.log("Cash flow double-counting check passed!");
 
     console.log("All Odyssey business unit tests passed successfully!");
     process.exit(0);

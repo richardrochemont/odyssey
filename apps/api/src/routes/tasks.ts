@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { authenticate, authorize } from "../middleware/auth";
 import * as service from "../services/tasks";
-import { TaskCreateSchema, TaskStatusEnum } from "@hearthlane/validation";
+import { TaskCreateSchema, TaskStatusEnum } from "@odyssey/validation";
 
 
 export default async function taskRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {

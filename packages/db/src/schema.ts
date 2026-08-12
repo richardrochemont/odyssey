@@ -23,6 +23,46 @@ export const users = pgTable("users", {
   archivedAt: timestamp("archived_at"),
 });
 
+// Import Engine Schema
+export const importSources = pgTable("import_sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 100 }).notNull(), // 'csv_upload' | 'bank_feed'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  archivedAt: timestamp("archived_at"),
+});
+
+export const importRuns = pgTable("import_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  sourceId: uuid("source_id").references(() => importSources.id).notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  importType: varchar("import_type", { length: 100 }).notNull(), // 'properties' | 'units' | 'tenants' | 'leases' | 'payments' | 'expenses' | 'transactions'
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // 'pending' | 'processing' | 'completed' | 'failed'
+  totalRows: integer("total_rows").notNull().default(0),
+  processedRows: integer("processed_rows").notNull().default(0),
+  failedRows: integer("failed_rows").notNull().default(0),
+  errorSummary: text("error_summary"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  archivedAt: timestamp("archived_at"),
+});
+
+export const importRows = pgTable("import_rows", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  runId: uuid("run_id").references(() => importRuns.id).notNull(),
+  rowNumber: integer("row_number").notNull(),
+  rawData: jsonb("raw_data").notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // 'pending' | 'validated' | 'imported' | 'failed'
+  validationErrors: jsonb("validation_errors"), // string[]
+  targetEntityId: uuid("target_entity_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // 3. Properties
 export const properties = pgTable("properties", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -37,6 +77,7 @@ export const properties = pgTable("properties", {
   valuationDate: timestamp("valuation_date"),
   valuationSource: varchar("valuation_source", { length: 255 }),
   valuationNotes: text("valuation_notes"),
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
@@ -49,6 +90,7 @@ export const buildings = pgTable("buildings", {
   propertyId: uuid("property_id").references(() => properties.id).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   address: varchar("address", { length: 255 }),
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
@@ -65,6 +107,7 @@ export const units = pgTable("units", {
   type: varchar("type", { length: 50 }).notNull().default("residential"),
   monthlyRent: integer("monthly_rent").notNull(), // stored in cents
   sizeSqFt: integer("size_sq_ft"),
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
@@ -78,6 +121,9 @@ export const tenants = pgTable("tenants", {
   email: varchar("email", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 50 }).notNull(),
   notes: text("notes"),
+  portalStatus: varchar("portal_status", { length: 50 }).notNull().default("inactive"), // 'invited' | 'active' | 'inactive'
+  inviteToken: varchar("invite_token", { length: 255 }),
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
@@ -96,6 +142,7 @@ export const leases = pgTable("leases", {
   status: varchar("status", { length: 50 }).notNull().default("draft"), // 'draft' | 'active' | 'ended' | 'renewed'
   renewalOption: boolean("renewal_option").notNull().default(false),
   notes: text("notes"),
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
@@ -124,8 +171,8 @@ export const maintenanceRequests = pgTable("maintenance_requests", {
   tenantId: uuid("tenant_id").references(() => tenants.id),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description").notNull(),
-  priority: varchar("priority", { length: 50 }).notNull().default("medium"), // 'low' | 'medium' | 'high' | 'urgent'
-  status: varchar("status", { length: 50 }).notNull().default("new"), // 'new' | 'triaged' | 'assigned' | 'scheduled' | 'completed' | 'closed'
+  priority: varchar("priority", { length: 50 }).notNull().default("medium"),
+  status: varchar("status", { length: 50 }).notNull().default("new"),
   attachmentPlaceholder: varchar("attachment_placeholder", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -139,7 +186,7 @@ export const workOrders = pgTable("work_orders", {
   maintenanceRequestId: uuid("maintenance_request_id").references(() => maintenanceRequests.id).notNull(),
   vendorId: uuid("vendor_id").references(() => vendors.id).notNull(),
   notes: text("notes"),
-  status: varchar("status", { length: 50 }).notNull().default("assigned"), // 'draft' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'
+  status: varchar("status", { length: 50 }).notNull().default("assigned"),
   scheduledAt: timestamp("scheduled_at"),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -155,25 +202,22 @@ export const tasks = pgTable("tasks", {
   description: text("description"),
   dueDate: timestamp("due_date").notNull(),
   ownerId: uuid("owner_id").references(() => users.id).notNull(),
-  status: varchar("status", { length: 50 }).notNull().default("todo"), // 'todo' | 'in_progress' | 'completed' | 'cancelled'
-  priority: varchar("priority", { length: 50 }).notNull().default("medium"), // 'low' | 'medium' | 'high' | 'urgent'
-  type: varchar("type", { length: 50 }).notNull().default("general"), // 'general' | 'maintenance' | 'lease_renewal' | 'inspection' | 'financial'
-  
-  // Relations (optional references)
+  status: varchar("status", { length: 50 }).notNull().default("todo"),
+  priority: varchar("priority", { length: 50 }).notNull().default("medium"),
+  type: varchar("type", { length: 50 }).notNull().default("general"),
   propertyId: uuid("property_id").references(() => properties.id),
   unitId: uuid("unit_id").references(() => units.id),
   tenantId: uuid("tenant_id").references(() => tenants.id),
   leaseId: uuid("lease_id").references(() => leases.id),
   maintenanceRequestId: uuid("maintenance_request_id").references(() => maintenanceRequests.id),
   workOrderId: uuid("work_order_id").references(() => workOrders.id),
-  
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
 });
 
-// 12. Financial Records
+// 12. Financial Records (Expenses & Historical Summaries)
 export const financialRecords = pgTable("financial_records", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => organizations.id).notNull(),
@@ -182,14 +226,38 @@ export const financialRecords = pgTable("financial_records", {
   type: varchar("type", { length: 50 }).notNull(), // 'income' | 'expense'
   amount: integer("amount").notNull(), // stored in cents
   date: timestamp("date").notNull(),
-  category: varchar("category", { length: 100 }).notNull(), // 'rent', 'maintenance_repair', 'utility_water', etc.
+  category: varchar("category", { length: 100 }).notNull(),
   notes: text("notes"),
+  vendorId: uuid("vendor_id").references(() => vendors.id),
+  sourceTransactionRef: varchar("source_transaction_ref", { length: 255 }),
+  state: varchar("state", { length: 50 }).notNull().default("approved"), // 'approved' | 'review'
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
 });
 
-// 13. Payments Ledger
+// 13. Charges
+export const charges = pgTable("charges", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  leaseId: uuid("lease_id").references(() => leases.id).notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  unitId: uuid("unit_id").references(() => units.id).notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // 'rent' | 'fee' | 'credit' | 'adjustment'
+  amount: integer("amount").notNull(), // stored in cents
+  dueDate: timestamp("due_date").notNull(),
+  balance: integer("balance").notNull(), // stored in cents (remaining unpaid obligation)
+  status: varchar("status", { length: 50 }).notNull().default("upcoming"), // 'upcoming' | 'paid' | 'partial' | 'overdue' | 'waived' | 'void'
+  notes: text("notes"),
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  archivedAt: timestamp("archived_at"),
+});
+
+// 14. Payments Ledger (Received Cash)
 export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => organizations.id).notNull(),
@@ -197,32 +265,53 @@ export const payments = pgTable("payments", {
   leaseId: uuid("lease_id").references(() => leases.id).notNull(),
   propertyId: uuid("property_id").references(() => properties.id).notNull(),
   unitId: uuid("unit_id").references(() => units.id).notNull(),
-  amountDue: integer("amount_due").notNull(), // stored in cents
-  amountReceived: integer("amount_received").notNull().default(0), // stored in cents
-  dueDate: timestamp("due_date").notNull(),
-  paidDate: timestamp("paid_date"),
-  status: varchar("status", { length: 50 }).notNull().default("upcoming"), // 'upcoming' | 'paid' | 'partial' | 'overdue' | 'waived'
-  paymentMethod: varchar("payment_method", { length: 100 }), // 'ach' | 'check' | 'cash'
+  
+  // Legacy / Compatibility Columns
+  amountDue: integer("amount_due").notNull().default(0), // legacy column
+  amountReceived: integer("amount_received").notNull().default(0), // received cash amount in cents
+  dueDate: timestamp("due_date").notNull().defaultNow(), // legacy column
+  paidDate: timestamp("paid_date"), // date transaction cleared
+  status: varchar("status", { length: 50 }).notNull().default("upcoming"), // legacy status/provider status: 'pending' | 'paid' | 'failed' | 'refunded' | 'disputed'
+  paymentMethod: varchar("payment_method", { length: 100 }), // 'ach' | 'card' | 'check' | 'cash'
   memo: text("memo"),
+  
+  // New Integration & Import Columns
+  providerId: varchar("provider_id", { length: 255 }),
+  source: varchar("source", { length: 50 }).notNull().default("manual"), // 'manual' | 'imported' | 'provider'
+  idempotencyKey: varchar("idempotency_key", { length: 255 }),
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
 });
 
-// 14. Audit Logs (Immutable)
+// 15. Payment Allocations
+export const paymentAllocations = pgTable("payment_allocations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  paymentId: uuid("payment_id").references(() => payments.id).notNull(),
+  chargeId: uuid("charge_id").references(() => charges.id).notNull(),
+  amount: integer("amount").notNull(), // amount allocated in cents
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  archivedAt: timestamp("archived_at"),
+});
+
+// 16. Audit Logs (Immutable)
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => organizations.id).notNull(),
   userId: uuid("user_id").references(() => users.id).notNull(),
-  entityType: varchar("entity_type", { length: 100 }).notNull(), // 'property' | 'lease' | 'maintenance_request' | 'task' | etc.
+  entityType: varchar("entity_type", { length: 100 }).notNull(),
   entityId: uuid("entity_id").notNull(),
-  action: varchar("action", { length: 50 }).notNull(), // 'create' | 'update' | 'archive' | 'status_transition'
+  action: varchar("action", { length: 50 }).notNull(),
   previousState: jsonb("previous_state"),
   newState: jsonb("new_state"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Relations definitions for Drizzle ORM queries
+// Relations Definitions
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
   properties: many(properties),
@@ -234,6 +323,29 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [organizations.id],
   }),
   tasks: many(tasks),
+}));
+
+export const importSourcesRelations = relations(importSources, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [importSources.orgId],
+    references: [organizations.id],
+  }),
+  runs: many(importRuns),
+}));
+
+export const importRunsRelations = relations(importRuns, ({ one, many }) => ({
+  source: one(importSources, {
+    fields: [importRuns.sourceId],
+    references: [importSources.id],
+  }),
+  rows: many(importRows),
+}));
+
+export const importRowsRelations = relations(importRows, ({ one }) => ({
+  run: one(importRuns, {
+    fields: [importRows.runId],
+    references: [importRuns.id],
+  }),
 }));
 
 export const propertiesRelations = relations(properties, ({ one, many }) => ({
@@ -273,7 +385,7 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   maintenanceRequests: many(maintenanceRequests),
 }));
 
-export const leasesRelations = relations(leases, ({ one }) => ({
+export const leasesRelations = relations(leases, ({ one, many }) => ({
   unit: one(units, {
     fields: [leases.unitId],
     references: [units.id],
@@ -282,6 +394,7 @@ export const leasesRelations = relations(leases, ({ one }) => ({
     fields: [leases.primaryTenantId],
     references: [tenants.id],
   }),
+  charges: many(charges),
 }));
 
 export const vendorsRelations = relations(vendors, ({ many }) => ({
@@ -331,9 +444,33 @@ export const financialRecordsRelations = relations(financialRecords, ({ one }) =
     fields: [financialRecords.unitId],
     references: [units.id],
   }),
+  vendor: one(vendors, {
+    fields: [financialRecords.vendorId],
+    references: [vendors.id],
+  }),
 }));
 
-export const paymentsRelations = relations(payments, ({ one }) => ({
+export const chargesRelations = relations(charges, ({ one, many }) => ({
+  parentLease: one(leases, {
+    fields: [charges.leaseId],
+    references: [leases.id],
+  }),
+  tenant: one(tenants, {
+    fields: [charges.tenantId],
+    references: [tenants.id],
+  }),
+  property: one(properties, {
+    fields: [charges.propertyId],
+    references: [properties.id],
+  }),
+  unit: one(units, {
+    fields: [charges.unitId],
+    references: [units.id],
+  }),
+  allocations: many(paymentAllocations),
+}));
+
+export const paymentsRelations = relations(payments, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [payments.orgId],
     references: [organizations.id],
@@ -354,5 +491,16 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
     fields: [payments.unitId],
     references: [units.id],
   }),
+  allocations: many(paymentAllocations),
 }));
 
+export const paymentAllocationsRelations = relations(paymentAllocations, ({ one }) => ({
+  payment: one(payments, {
+    fields: [paymentAllocations.paymentId],
+    references: [payments.id],
+  }),
+  charge: one(charges, {
+    fields: [paymentAllocations.chargeId],
+    references: [charges.id],
+  }),
+}));

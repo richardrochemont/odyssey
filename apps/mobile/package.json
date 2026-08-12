@@ -1,5 +1,5 @@
 {
-  "name": "@hearthlane/mobile",
+  "name": "@odyssey/mobile",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
-    "@hearthlane/tsconfig": "workspace:*",
+    "@odyssey/tsconfig": "workspace:*",
     "@types/react": "~18.2.45",
     "typescript": "^5.4.5"
   }

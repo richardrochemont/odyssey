@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { authenticate, authorize } from "../middleware/auth";
 import * as service from "../services/maintenance";
-import { MaintenanceRequestCreateSchema, WorkOrderCreateSchema, VendorCreateSchema, MaintenanceStatusEnum, WorkOrderStatusEnum } from "@hearthlane/validation";
+import { MaintenanceRequestCreateSchema, WorkOrderCreateSchema, VendorCreateSchema, MaintenanceStatusEnum, WorkOrderStatusEnum } from "@odyssey/validation";
 import { z } from "zod";
 
 export default async function maintenanceRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
