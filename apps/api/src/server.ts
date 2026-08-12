@@ -117,8 +117,8 @@ async function startServer() {
     try {
       await db.execute(sql`select 1`);
       return { status: "healthy", database: "connected", timestamp: new Date().toISOString() };
-    } catch (e: any) {
-      app.log.error(`HealthCheck Database failure: ${e.message}`);
+    } catch (error: unknown) {
+      app.log.error({ err: error }, "Database health check failed");
       return reply.code(503).send({
         status: "unhealthy",
         database: "disconnected",
@@ -135,8 +135,8 @@ async function startServer() {
         return { status: "healthy", redis: "connected", timestamp: new Date().toISOString() };
       }
       throw new Error(`Unexpected Redis ping response: ${ping}`);
-    } catch (e: any) {
-      app.log.error(`HealthCheck Redis failure: ${e.message}`);
+    } catch (error: unknown) {
+      app.log.error({ err: error }, "Redis health check failed");
       return reply.code(503).send({
         status: "unhealthy",
         redis: "disconnected",
