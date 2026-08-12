@@ -454,9 +454,7 @@ export default function CashFlowPage() {
                       setTenantId(l.primaryTenantId);
                       setUnitId(l.unitId);
                       setAmountDue(l.monthlyRent.toString());
-                      // Find property matching unit's parent property
-                      const prop = properties.find((p) => p.nickname === l.propertyNickname);
-                      if (prop) setPropertyId(prop.id);
+                      setPropertyId(l.propertyId);
                     }
                   }}
                   className="w-full border border-border p-2 rounded-md outline-none focus:border-primary"
