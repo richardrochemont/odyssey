@@ -43,7 +43,11 @@ export default function LoginPage() {
       const emailParam = params.get("email");
       const registerParam = params.get("register");
       const tokenParam = params.get("token");
+      const expiredParam = params.get("expired");
 
+      if (expiredParam === "true") {
+        setError("Your session has expired. Please sign in again.");
+      }
       if (emailParam) {
         setLoginEmail(emailParam);
         setRegisterEmail(emailParam);
@@ -88,13 +92,17 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.error || "Invalid email or password");
+        const rawErr = errData.error || "Invalid email or password";
+        if (rawErr.toLowerCase().includes("unauthorized") || rawErr.toLowerCase().includes("token")) {
+          throw new Error("Invalid email or password");
+        }
+        throw new Error(rawErr);
       }
 
       const session = await res.json();
       login(session.token, session.user);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Invalid email or password");
       setIsSubmitting(false);
     }
   };

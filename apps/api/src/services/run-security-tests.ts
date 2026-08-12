@@ -177,6 +177,9 @@ async function runSecuritySuite() {
   const { runEmailTests } = await import("./email.test");
   await runEmailTests();
 
+  const { runAuthFlowTests } = await import("./authFlow.test");
+  await runAuthFlowTests();
+
   console.log("\nAll Fastify Injection & Service Unit Security Tests Passed Successfully!");
 }
 

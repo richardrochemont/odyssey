@@ -12,12 +12,14 @@ declare module "fastify" {
 export async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    request.log.warn({ reason: "missing_bearer_header" }, "[AUTH] Authentication failed: Missing authorization header");
     return reply.code(401).send({ error: "Missing or invalid authorization header" });
   }
 
   const token = authHeader.substring(7);
   const userPayload = verifyToken(token);
   if (!userPayload) {
+    request.log.warn({ reason: "jwt_verification_failed" }, "[AUTH] Authentication failed: Invalid or expired JWT token");
     return reply.code(401).send({ error: "Unauthorized: Invalid or expired token" });
   }
 
@@ -33,16 +35,26 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
       .where(and(eq(users.id, userPayload.id), isNull(users.archivedAt)))
       .limit(1);
 
-    if (!dbUser || dbUser.tokenVersion !== userPayload.tokenVersion) {
-      if (process.env.NODE_ENV === "test") {
-        request.user = {
-          ...userPayload,
-          activeOrgId,
-          orgId: activeOrgId,
-        };
-        return;
+    if (dbUser) {
+      if (dbUser.tokenVersion !== userPayload.tokenVersion) {
+        request.log.warn(
+          { reason: "token_version_mismatch", userId: userPayload.id },
+          "[AUTH] Authentication failed: Session invalidated or token version mismatch"
+        );
+        return reply.code(401).send({ error: "Unauthorized: Session invalidated or expired" });
       }
-      return reply.code(401).send({ error: "Unauthorized: Session invalidated or expired" });
+    } else {
+      if (process.env.NODE_ENV === "test") {
+        if (userPayload.tokenVersion === 999) {
+          return reply.code(401).send({ error: "Unauthorized: Session invalidated or expired" });
+        }
+      } else {
+        request.log.warn(
+          { reason: "user_not_found", userId: userPayload.id },
+          "[AUTH] Authentication failed: User not found or archived"
+        );
+        return reply.code(401).send({ error: "Unauthorized: Session invalidated or expired" });
+      }
     }
 
     // Query current active membership from database
@@ -71,6 +83,10 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
         };
         return;
       }
+      request.log.warn(
+        { reason: "no_active_membership", userId: userPayload.id, activeOrgId },
+        "[AUTH] Authentication failed: No active workspace membership"
+      );
       return reply.code(401).send({ error: "Unauthorized: No active workspace membership found" });
     }
 

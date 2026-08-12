@@ -10,6 +10,7 @@ export interface User {
   role: "owner" | "manager" | "accountant" | "maintenance" | "read_only";
   activeOrgId?: string;
   orgId: string;
+  tokenVersion?: number;
 }
 
 export interface WorkspaceItem {
@@ -64,12 +65,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const logout = useCallback(() => {
+    localStorage.removeItem("hearthlane_token");
+    setToken(null);
+    setUser(null);
+    setWorkspaces([]);
+    router.push("/login");
+  }, [router]);
+
+  const logoutExpired = useCallback(() => {
+    localStorage.removeItem("hearthlane_token");
+    setToken(null);
+    setUser(null);
+    setWorkspaces([]);
+    router.push("/login?expired=true");
+  }, [router]);
+
   const fetchWorkspaces = useCallback(async (authToken: string) => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
       const res = await fetch(`${apiUrl}/workspaces`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
+      if (res.status === 401) {
+        logoutExpired();
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setWorkspaces(data);
@@ -77,13 +98,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       // Silently ignore workspace list fetch errors
     }
-  }, []);
+  }, [logoutExpired]);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logoutExpired();
+    };
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("auth:unauthorized", handleUnauthorized);
+  }, [logoutExpired]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("hearthlane_token");
     if (storedToken) {
       const decoded = parseJwt(storedToken);
-      if (decoded) {
+      if (decoded && decoded.id && decoded.tokenVersion !== undefined) {
         setToken(storedToken);
         setUser(decoded);
         fetchWorkspaces(storedToken);
@@ -107,14 +136,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(decoded);
     fetchWorkspaces(newToken);
     router.push("/");
-  };
-
-  const logout = () => {
-    localStorage.removeItem("hearthlane_token");
-    setToken(null);
-    setUser(null);
-    setWorkspaces([]);
-    router.push("/login");
   };
 
   const switchWorkspace = async (orgId: string) => {
