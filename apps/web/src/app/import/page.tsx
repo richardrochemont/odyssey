@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import Header from "@/components/Header";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Play, RefreshCw, BarChart2 } from "lucide-react";
+import { Upload, CheckCircle2, AlertTriangle, Play, RefreshCw, BarChart2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface ImportRun {
@@ -26,7 +26,7 @@ export default function ImportPage() {
   const [fileName, setFileName] = useState("");
   const [importType, setImportType] = useState<"properties" | "units" | "tenants" | "leases" | "payments" | "expenses">("properties");
   const [headers, setHeaders] = useState<string[]>([]);
-  const [previewRows, setPreviewRows] = useState<Record<string, string>[]>([]);
+
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -88,7 +88,7 @@ export default function ImportPage() {
     },
     onSuccess: (data) => {
       setHeaders(data.headers);
-      setPreviewRows(data.previewRows);
+
       // Auto-suggest mapping based on matching strings
       const initialMap: Record<string, string> = {};
       const expected = expectedFieldsMap[importType] || [];
@@ -129,7 +129,7 @@ export default function ImportPage() {
       setCsvContent("");
       setFileName("");
       setHeaders([]);
-      setPreviewRows([]);
+
     },
     onError: (err: any) => setError(err.message),
   });
@@ -170,7 +170,7 @@ export default function ImportPage() {
     <div className="min-h-screen bg-[#0D0E12] text-slate-100 flex">
       {/* Main Panel */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#0F1015]">
-        <Header title="Imports Dashboard" />
+        <Header />
 
         <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
           
@@ -192,7 +192,7 @@ export default function ImportPage() {
                         onClick={() => {
                           setImportType(type as any);
                           setHeaders([]);
-                          setPreviewRows([]);
+
                         }}
                         className={`px-4 py-3 rounded-xl border text-xs font-semibold capitalize transition-all duration-300 ${
                           importType === type

@@ -38,7 +38,7 @@ export default function ReconciliationPage() {
     <div className="min-h-screen bg-[#0D0E12] text-slate-100 flex">
       {/* Main Panel */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#0F1015]">
-        <Header title="Reconciliation Cockpit" />
+        <Header />
 
         <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
           
