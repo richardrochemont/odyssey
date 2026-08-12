@@ -26,11 +26,6 @@ interface Lease {
   propertyId: string;
 }
 
-interface Property {
-  id: string;
-  nickname: string;
-  units: { id: string; unitNumber: string }[];
-}
 
 interface Payment {
   id: string;
@@ -99,12 +94,6 @@ export default function CashFlowPage() {
   const { data: payments = [], isLoading: paymentsLoading } = useQuery<Payment[]>({
     queryKey: ["payments", token],
     queryFn: () => fetchWithAuth("/payments"),
-    enabled: !!token,
-  });
-
-  const { data: properties = [] } = useQuery<Property[]>({
-    queryKey: ["properties", token],
-    queryFn: () => fetchWithAuth("/properties"),
     enabled: !!token,
   });
 
