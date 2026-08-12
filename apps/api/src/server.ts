@@ -13,6 +13,8 @@ dotenv.config({ path: "../../.env" });
 
 // Import routes
 import authRoutes from "./routes/auth";
+import workspaceRoutes from "./routes/workspaces";
+import invitationRoutes from "./routes/invitations";
 import propertyRoutes from "./routes/properties";
 import leaseRoutes from "./routes/leases";
 import maintenanceRoutes from "./routes/maintenance";
@@ -35,9 +37,17 @@ async function startServer() {
       redact: [
         "req.headers.authorization",
         "req.headers.cookie",
+        "req.body.password",
+        "req.body.currentPassword",
+        "req.body.newPassword",
+        "req.body.confirmPassword",
+        "req.body.token",
+        "req.body.invitationToken",
         "*.password",
         "*.passwordHash",
         "*.token",
+        "*.tokenHash",
+        "*.invitationToken",
         "*.jwtSecret",
         "*.databaseUrl",
         "*.apiKey",
@@ -61,9 +71,12 @@ async function startServer() {
     credentials: true,
   });
 
-  // Production Security Assertion
+  // Production Security & Environment Assertions
   if (process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_AUTH_DIRECTORY === "true") {
     throw new Error("FATAL SECURITY CONFIGURATION: ENABLE_DEV_AUTH_DIRECTORY must not be set to 'true' in production.");
+  }
+  if (process.env.NODE_ENV === "production" && !process.env.APP_URL) {
+    app.log.error("[WARNING] APP_URL environment variable is missing in production. Defaulting to fallback.");
   }
 
   // Rate Limiting (Redis-backed for cluster/production scalability)
@@ -129,6 +142,8 @@ async function startServer() {
 
   // Register endpoints
   await app.register(authRoutes, { prefix: "/auth" });
+  await app.register(workspaceRoutes, { prefix: "/workspaces" });
+  await app.register(invitationRoutes, { prefix: "/invitations" });
   await app.register(propertyRoutes, { prefix: "/properties" });
   await app.register(leaseRoutes, { prefix: "/leases" });
   await app.register(maintenanceRoutes, { prefix: "/maintenance" });

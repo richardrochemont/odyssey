@@ -23,15 +23,17 @@ import {
 } from "lucide-react";
 import SearchPalette from "./SearchPalette";
 import AssistantPanel from "./AssistantPanel";
+import CreateWorkspaceModal from "./CreateWorkspaceModal";
 
 export default function Header() {
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, workspaces, switchWorkspace } = useAuth();
   const pathname = usePathname();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
 
   const addMenuRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -340,13 +342,51 @@ export default function Header() {
                 {/* User details */}
                 <div className="px-3 py-2 border-b border-border bg-neutral-50">
                   <p className="font-bold text-foreground truncate">{user.name}</p>
-                  <p className="text-[10px] text-muted truncate mt-0.5">{roleLabels[user.role]}</p>
+                  <p className="text-[10px] text-muted truncate mt-0.5">{roleLabels[user.role] || user.role}</p>
                 </div>
-                {/* Active Workspace */}
-                <div className="px-3 py-2 border-b border-border">
-                  <p className="text-[9px] uppercase font-bold text-muted tracking-wider">Active Workspace</p>
-                  <p className="font-semibold text-foreground truncate mt-0.5">Odyssey Capital LLC</p>
+
+                {/* Workspace Switcher */}
+                <div className="px-3 py-2 border-b border-border font-sans" data-testid="workspace-switcher">
+                  <p className="text-[9px] uppercase font-bold text-muted tracking-wider mb-1">Workspaces</p>
+                  <div className="space-y-0.5 max-h-36 overflow-y-auto">
+                    {workspaces.length > 0 ? (
+                      workspaces.map((ws) => (
+                        <button
+                          key={ws.orgId}
+                          onClick={() => {
+                            if (!ws.isActive) {
+                              setIsProfileMenuOpen(false);
+                              switchWorkspace(ws.orgId);
+                            }
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-left transition-colors text-xs ${
+                            ws.isActive ? "bg-neutral-100 font-bold text-foreground" : "hover:bg-neutral-50 text-muted hover:text-foreground"
+                          }`}
+                          data-testid={`switch-workspace-${ws.slug}`}
+                        >
+                          <span className="truncate pr-2">{ws.name}</span>
+                          {ws.isActive && <span className="text-primary font-bold text-[10px]">Active</span>}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1 text-xs text-foreground font-semibold truncate">
+                        Active Workspace
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      setIsCreateWorkspaceModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-1.5 mt-2 pt-1.5 border-t border-border text-xs font-bold text-primary hover:text-neutral-800 transition-colors"
+                    data-testid="create-workspace-trigger"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Create workspace
+                  </button>
                 </div>
+
                 {/* Menu items */}
                 <Link
                   href="/settings"
@@ -356,6 +396,16 @@ export default function Header() {
                 >
                   <SettingsIcon className="h-3.5 w-3.5 text-muted" />
                   Workspace Settings
+                </Link>
+                <Link
+                  href="/settings/team"
+                  onClick={() => setIsProfileMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-foreground hover:bg-neutral-50 transition-colors"
+                  role="menuitem"
+                  data-testid="team-members-link"
+                >
+                  <Users className="h-3.5 w-3.5 text-muted" />
+                  Team Members
                 </Link>
                 <button
                   onClick={() => {
@@ -451,6 +501,12 @@ export default function Header() {
 
       {/* Global Search command palette */}
       <SearchPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      {/* Create Workspace Modal */}
+      <CreateWorkspaceModal
+        isOpen={isCreateWorkspaceModalOpen}
+        onClose={() => setIsCreateWorkspaceModalOpen(false)}
+      />
 
       {/* Expose AssistantPanel globally under Header so it remains accessible from all routes */}
       <AssistantPanel />

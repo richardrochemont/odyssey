@@ -13,8 +13,9 @@ if (JWT_SECRET === FALLBACK_JWT_SECRET && process.env.NODE_ENV === "production")
 
 export interface UserSessionPayload {
   id: string;
-  orgId: string;
-  role: "owner" | "manager" | "maintenance" | "read_only";
+  activeOrgId: string;
+  orgId: string; // compatibility fallback
+  role: "owner" | "manager" | "accountant" | "maintenance" | "read_only";
   email: string;
   name: string;
   tokenVersion: number;

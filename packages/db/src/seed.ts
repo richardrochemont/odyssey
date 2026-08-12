@@ -37,48 +37,79 @@ async function main() {
   await db.delete(schema.buildings);
   await db.delete(schema.properties);
   await db.delete(schema.users);
+  await db.delete(schema.organizationInvitations);
+  await db.delete(schema.organizationMemberships);
   await db.delete(schema.organizations);
 
   // 1. Create Organization
   console.log("Creating organization...");
   const [org] = await db.insert(schema.organizations).values({
     name: "Odyssey Capital LLC",
+    slug: "odyssey-capital-llc",
   }).returning();
 
-  // 2. Create Users (Owner, Manager, Maintenance, Read Only)
-  console.log("Creating users...");
+  // 2. Create Users (Owner, Manager, Maintenance, Read Only) & Memberships
+  console.log("Creating users & memberships...");
   const passwordHash = hashPassword("password123");
   
   const [ownerUser] = await db.insert(schema.users).values({
     orgId: org.id,
+    lastActiveOrgId: org.id,
     email: "owner@odyssey.com",
     passwordHash,
     name: "Genevieve Hearth",
     role: "owner",
   }).returning();
+  await db.insert(schema.organizationMemberships).values({
+    orgId: org.id,
+    userId: ownerUser.id,
+    role: "owner",
+    status: "active",
+  });
 
   const [managerUser] = await db.insert(schema.users).values({
     orgId: org.id,
+    lastActiveOrgId: org.id,
     email: "manager@odyssey.com",
     passwordHash,
     name: "Marcus Lane",
     role: "manager",
   }).returning();
+  await db.insert(schema.organizationMemberships).values({
+    orgId: org.id,
+    userId: managerUser.id,
+    role: "manager",
+    status: "active",
+  });
 
   const [_maintenanceUser] = await db.insert(schema.users).values({
     orgId: org.id,
+    lastActiveOrgId: org.id,
     email: "maintenance@odyssey.com",
     passwordHash,
     name: "Dave Fixer",
     role: "maintenance",
   }).returning();
-
-  await db.insert(schema.users).values({
+  await db.insert(schema.organizationMemberships).values({
     orgId: org.id,
+    userId: _maintenanceUser.id,
+    role: "maintenance",
+    status: "active",
+  });
+
+  const [readOnlyUser] = await db.insert(schema.users).values({
+    orgId: org.id,
+    lastActiveOrgId: org.id,
     email: "readonly@odyssey.com",
     passwordHash,
     name: "Investor Bob",
     role: "read_only",
+  }).returning();
+  await db.insert(schema.organizationMemberships).values({
+    orgId: org.id,
+    userId: readOnlyUser.id,
+    role: "read_only",
+    status: "active",
   });
 
   // 3. Create Properties

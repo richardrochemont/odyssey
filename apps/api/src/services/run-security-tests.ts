@@ -4,6 +4,8 @@ import fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import authRoutes from "../routes/auth";
+import workspaceRoutes from "../routes/workspaces";
+import invitationRoutes from "../routes/invitations";
 import propertyRoutes from "../routes/properties";
 import { generateToken } from "./auth";
 import { UserChangePasswordSchema } from "@odyssey/validation";
@@ -22,6 +24,8 @@ async function buildTestApp() {
   });
 
   await app.register(authRoutes, { prefix: "/auth" });
+  await app.register(workspaceRoutes, { prefix: "/workspaces" });
+  await app.register(invitationRoutes, { prefix: "/invitations" });
   await app.register(propertyRoutes, { prefix: "/properties" });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -52,6 +56,7 @@ async function runSecuritySuite() {
 
   const ownerTokenOrg1 = generateToken({
     id: "00000000-0000-0000-0000-000000000001",
+    activeOrgId: mockOrgId1,
     orgId: mockOrgId1,
     role: "owner",
     email: "owner1@example.com",
@@ -62,6 +67,7 @@ async function runSecuritySuite() {
 
   const managerTokenOrg1 = generateToken({
     id: "00000000-0000-0000-0000-000000000002",
+    activeOrgId: mockOrgId1,
     orgId: mockOrgId1,
     role: "manager",
     email: "manager1@example.com",
@@ -137,6 +143,30 @@ async function runSecuritySuite() {
   console.log("6. Testing Organization Isolation (Org 1 vs Org 2)...");
   assert.notStrictEqual(mockOrgId1, mockOrgId2, "Organizations must be distinct");
   console.log("   -> Passed!");
+
+  // 7. Test Workspace Route RBAC (Manager cannot create invitations)
+  console.log("7. Testing POST /workspaces/:orgId/invitations with Manager role -> 403...");
+  const res7 = await app.inject({
+    method: "POST",
+    url: `/workspaces/${mockOrgId1}/invitations`,
+    headers: {
+      authorization: `Bearer ${managerTokenOrg1}`,
+      "content-type": "application/json",
+    },
+    payload: { email: "newmember@example.com", role: "manager" },
+  });
+  assert.strictEqual(res7.statusCode, 403);
+  console.log("   -> Passed! (403 returned)");
+
+  // 8. Test Workspace Mismatch Protection (Org 1 token accessing Org 2 route -> 403)
+  console.log("8. Testing Workspace Mismatch Protection (Org 1 token vs Org 2 route)...");
+  const res8 = await app.inject({
+    method: "GET",
+    url: `/workspaces/${mockOrgId2}/members`,
+    headers: { authorization: `Bearer ${ownerTokenOrg1}` },
+  });
+  assert.strictEqual(res8.statusCode, 403);
+  console.log("   -> Passed! (403 returned)");
 
   await app.close();
   console.log("\nAll Fastify Injection Security Tests Passed Successfully!");

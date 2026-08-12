@@ -7,6 +7,8 @@ export default defineConfig({
   out: "./migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "postgres://postgres:password@localhost:5432/odyssey",
+    url: (process.env.DATABASE_URL && process.env.DATABASE_URL !== "postgres://localhost:5432/odyssey")
+      ? process.env.DATABASE_URL
+      : "postgres://postgres:password@localhost:5432/odyssey",
   },
 });

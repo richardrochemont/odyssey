@@ -1,8 +1,12 @@
 import { z } from "zod";
 
 // Roles & Auth Enums
-export const UserRoleEnum = z.enum(["owner", "manager", "maintenance", "read_only"]);
+// Roles & Auth Enums
+export const UserRoleEnum = z.enum(["owner", "manager", "accountant", "maintenance", "read_only"]);
 export type UserRole = z.infer<typeof UserRoleEnum>;
+
+export const OrganizationMembershipRoleEnum = z.enum(["owner", "manager", "accountant", "maintenance", "read_only"]);
+export type OrganizationMembershipRole = z.infer<typeof OrganizationMembershipRoleEnum>;
 
 // Property & Unit Enums
 export const PropertyTypeEnum = z.enum(["single_family", "multi_family", "condo", "townhouse", "apartment_building"]);
@@ -80,7 +84,11 @@ export const UserSignUpSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  orgName: z.string().min(2, "Organization name must be at least 2 characters"),
+  orgName: z.string().min(2, "Organization name must be at least 2 characters").optional(),
+  invitationToken: z.string().optional(),
+}).refine((data) => !!data.invitationToken || (!!data.orgName && data.orgName.length >= 2), {
+  message: "Organization name is required when not registering with an invitation",
+  path: ["orgName"],
 });
 export type UserSignUpInput = z.infer<typeof UserSignUpSchema>;
 
@@ -97,6 +105,41 @@ export const UserChangePasswordSchema = z.object({
   path: ["confirmPassword"],
 });
 export type UserChangePasswordInput = z.infer<typeof UserChangePasswordSchema>;
+
+// Workspace & Team Schemas
+export const WorkspaceCreateSchema = z.object({
+  name: z.string().min(2, "Workspace name must be at least 2 characters"),
+  slug: z.string().min(2, "Slug must be at least 2 characters").optional(),
+});
+export type WorkspaceCreateInput = z.infer<typeof WorkspaceCreateSchema>;
+
+export const WorkspaceSwitchSchema = z.object({
+  orgId: z.string().uuid("Invalid organization ID"),
+});
+export type WorkspaceSwitchInput = z.infer<typeof WorkspaceSwitchSchema>;
+
+export const InvitationCreateSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  role: OrganizationMembershipRoleEnum,
+  note: z.string().optional(),
+  confirmOwnerInvite: z.boolean().optional(),
+});
+export type InvitationCreateInput = z.infer<typeof InvitationCreateSchema>;
+
+export const InvitationPreviewSchema = z.object({
+  token: z.string().min(10, "Invalid invitation token"),
+});
+export type InvitationPreviewInput = z.infer<typeof InvitationPreviewSchema>;
+
+export const InvitationAcceptSchema = z.object({
+  token: z.string().min(10, "Invalid invitation token"),
+});
+export type InvitationAcceptInput = z.infer<typeof InvitationAcceptSchema>;
+
+export const MemberRoleUpdateSchema = z.object({
+  role: OrganizationMembershipRoleEnum,
+});
+export type MemberRoleUpdateInput = z.infer<typeof MemberRoleUpdateSchema>;
 
 // Property
 export const PropertyCreateSchema = z.object({

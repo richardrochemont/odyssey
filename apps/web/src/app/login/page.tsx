@@ -30,10 +30,32 @@ export default function LoginPage() {
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerOrgName, setRegisterOrgName] = useState("");
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingSeedId, setSubmittingSeedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Process query parameters client-side
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const emailParam = params.get("email");
+      const registerParam = params.get("register");
+      const tokenParam = params.get("token");
+
+      if (emailParam) {
+        setLoginEmail(emailParam);
+        setRegisterEmail(emailParam);
+      }
+      if (registerParam === "true") {
+        setMode("register");
+      }
+      if (tokenParam) {
+        setInvitationToken(tokenParam);
+      }
+    }
+  }, []);
 
   // Discover seeded users for dev selector
   useEffect(() => {
@@ -47,8 +69,6 @@ export default function LoginPage() {
       } catch (err: any) {
         // Silently log or keep list empty in prod if dev endpoints are disabled
         console.log("Seeded credentials discovery skipped/disabled.");
-      } finally {
-        // finished fetching seeds
       }
     }
     fetchUsers();
@@ -85,15 +105,22 @@ export default function LoginPage() {
     setError(null);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const body: Record<string, any> = {
+        name: registerName,
+        email: registerEmail,
+        password: registerPassword,
+      };
+
+      if (invitationToken) {
+        body.invitationToken = invitationToken;
+      } else {
+        body.orgName = registerOrgName;
+      }
+
       const res = await fetch(`${apiUrl}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: registerName,
-          email: registerEmail,
-          password: registerPassword,
-          orgName: registerOrgName,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -258,24 +285,26 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                Organization / Company Name
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Building className="h-4 w-4" />
+            {!invitationToken && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                  Organization / Company Name
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Building className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={registerOrgName}
+                    onChange={(e) => setRegisterOrgName(e.target.value)}
+                    placeholder="Odyssey Capital LLC"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all text-sm"
+                  />
                 </div>
-                <input
-                  type="text"
-                  required
-                  value={registerOrgName}
-                  onChange={(e) => setRegisterOrgName(e.target.value)}
-                  placeholder="Odyssey Capital LLC"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all text-sm"
-                />
               </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">

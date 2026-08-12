@@ -19,6 +19,8 @@ async function main() {
 
   // Clear existing data
   console.log("Clearing existing data...");
+  await db.delete(schema.organizationInvitations);
+  await db.delete(schema.organizationMemberships);
   await db.delete(schema.paymentAllocations);
   await db.delete(schema.charges);
   await db.delete(schema.importRows);
@@ -43,43 +45,37 @@ async function main() {
   console.log("Creating organization...");
   const [org] = await db.insert(schema.organizations).values({
     name: "Odyssey Capital LLC",
+    slug: "odyssey-capital-llc",
   }).returning();
 
-  // 2. Create Users (Owner, Manager, Maintenance, Read Only)
-  console.log("Creating users...");
+  // 2. Create Users & Memberships
+  console.log("Creating users & memberships...");
   const passwordHash = hashPassword("password123");
   
-  await db.insert(schema.users).values({
-    orgId: org.id,
-    email: "owner@odyssey.com",
-    passwordHash,
-    name: "Genevieve Hearth",
-    role: "owner",
-  });
+  const userDefs = [
+    { email: "owner@odyssey.com", name: "Genevieve Hearth", role: "owner" as const },
+    { email: "manager@odyssey.com", name: "Marcus Lane", role: "manager" as const },
+    { email: "maintenance@odyssey.com", name: "Dave Fixer", role: "maintenance" as const },
+    { email: "readonly@odyssey.com", name: "Investor Bob", role: "read_only" as const },
+  ];
 
-  await db.insert(schema.users).values({
-    orgId: org.id,
-    email: "manager@odyssey.com",
-    passwordHash,
-    name: "Marcus Lane",
-    role: "manager",
-  });
+  for (const def of userDefs) {
+    const [u] = await db.insert(schema.users).values({
+      orgId: org.id,
+      lastActiveOrgId: org.id,
+      email: def.email,
+      passwordHash,
+      name: def.name,
+      role: def.role,
+    }).returning();
 
-  await db.insert(schema.users).values({
-    orgId: org.id,
-    email: "maintenance@odyssey.com",
-    passwordHash,
-    name: "Dave Fixer",
-    role: "maintenance",
-  });
-
-  await db.insert(schema.users).values({
-    orgId: org.id,
-    email: "readonly@odyssey.com",
-    passwordHash,
-    name: "Investor Bob",
-    role: "read_only",
-  });
+    await db.insert(schema.organizationMemberships).values({
+      orgId: org.id,
+      userId: u.id,
+      role: def.role,
+      status: "active",
+    });
+  }
 
   console.log("Database seeded successfully with users only!");
   await pool.end();
