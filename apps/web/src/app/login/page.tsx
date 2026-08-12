@@ -61,9 +61,12 @@ export default function LoginPage() {
     }
   }, []);
 
-  // Discover seeded users for dev selector
+  // Discover seeded users for dev selector (development only)
   useEffect(() => {
     async function fetchUsers() {
+      if (!showDevOptions || process.env.NODE_ENV === "production") {
+        return;
+      }
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
         const res = await fetch(`${apiUrl}/auth/users`);
@@ -76,7 +79,7 @@ export default function LoginPage() {
       }
     }
     fetchUsers();
-  }, []);
+  }, [showDevOptions]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
