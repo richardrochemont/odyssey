@@ -107,42 +107,42 @@ async function startServer() {
   await app.register(webhookRoutes, { prefix: "/webhooks" });
   await app.register(portalRoutes, { prefix: "/portal" });
 
-  // Upgraded production-safe health check verifying api, database, and redis
-  app.get("/health", async (_request, reply) => {
-    const checks: Record<string, string> = {
-      api: "healthy",
-      database: "unknown",
-      redis: "unknown",
-    };
+  // Liveness health check returning 200 without DB/Redis queries
+  app.get("/health", async () => {
+    return { status: "healthy", timestamp: new Date().toISOString() };
+  });
 
-    let isHealthy = true;
-
-    // Verify DB
+  // Database connectivity check
+  app.get("/health/db", async (_request, reply) => {
     try {
       await db.execute(sql`select 1`);
-      checks.database = "healthy";
+      return { status: "healthy", database: "connected", timestamp: new Date().toISOString() };
     } catch (e: any) {
-      checks.database = "unhealthy";
-      isHealthy = false;
       app.log.error(`HealthCheck Database failure: ${e.message}`);
+      return reply.code(503).send({
+        status: "unhealthy",
+        database: "disconnected",
+        timestamp: new Date().toISOString()
+      });
     }
+  });
 
-    // Verify Redis
+  // Redis connectivity check
+  app.get("/health/redis", async (_request, reply) => {
     try {
       const ping = await redis.ping();
-      checks.redis = ping === "PONG" ? "healthy" : "unhealthy";
-      if (ping !== "PONG") isHealthy = false;
+      if (ping === "PONG") {
+        return { status: "healthy", redis: "connected", timestamp: new Date().toISOString() };
+      }
+      throw new Error(`Unexpected Redis ping response: ${ping}`);
     } catch (e: any) {
-      checks.redis = "unhealthy";
-      isHealthy = false;
       app.log.error(`HealthCheck Redis failure: ${e.message}`);
+      return reply.code(503).send({
+        status: "unhealthy",
+        redis: "disconnected",
+        timestamp: new Date().toISOString()
+      });
     }
-
-    if (!isHealthy) {
-      return reply.code(503).send({ status: "unhealthy", timestamp: new Date().toISOString(), checks });
-    }
-
-    return { status: "healthy", timestamp: new Date().toISOString(), checks };
   });
 
   try {
