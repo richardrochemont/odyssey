@@ -1,10 +1,11 @@
-import { pgTable, uuid, varchar, text, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, boolean, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // 1. Organizations (Multi-tenant scope)
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
@@ -19,10 +20,50 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }).notNull(),
   role: varchar("role", { length: 50 }).notNull().default("read_only"), // 'owner' | 'manager' | 'maintenance' | 'read_only'
   tokenVersion: integer("token_version").notNull().default(1),
+  lastActiveOrgId: uuid("last_active_org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
 });
+
+// 2b. Organization Memberships (Multi-workspace membership and RBAC)
+export const organizationMemberships = pgTable(
+  "organization_memberships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").references(() => organizations.id).notNull(),
+    userId: uuid("user_id").references(() => users.id).notNull(),
+    role: varchar("role", { length: 50 }).notNull(), // 'owner' | 'manager' | 'accountant' | 'maintenance' | 'read_only'
+    status: varchar("status", { length: 50 }).notNull().default("active"), // 'active' | 'suspended'
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    archivedAt: timestamp("archived_at"),
+  },
+  (table) => ({
+    uniqueOrgUser: uniqueIndex("unique_org_user_membership").on(table.orgId, table.userId),
+  })
+);
+
+// 2c. Organization Invitations (Team onboarding with token hashing)
+export const organizationInvitations = pgTable(
+  "organization_invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").references(() => organizations.id).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    role: varchar("role", { length: 50 }).notNull(), // 'owner' | 'manager' | 'accountant' | 'maintenance' | 'read_only'
+    invitedByUserId: uuid("invited_by_user_id").references(() => users.id).notNull(),
+    tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+    note: text("note"),
+    status: varchar("status", { length: 50 }).notNull().default("pending"), // 'draft' | 'pending' | 'sent' | 'accepted' | 'expired' | 'revoked'
+    expiresAt: timestamp("expires_at").notNull(),
+    acceptedAt: timestamp("accepted_at"),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  }
+);
 
 // Import Engine Schema
 export const importSources = pgTable("import_sources", {
@@ -315,6 +356,8 @@ export const auditLogs = pgTable("audit_logs", {
 // Relations Definitions
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   users: many(users),
+  memberships: many(organizationMemberships),
+  invitations: many(organizationInvitations),
   properties: many(properties),
 }));
 
@@ -323,7 +366,34 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.orgId],
     references: [organizations.id],
   }),
+  lastActiveOrganization: one(organizations, {
+    fields: [users.lastActiveOrgId],
+    references: [organizations.id],
+  }),
+  memberships: many(organizationMemberships),
   tasks: many(tasks),
+}));
+
+export const organizationMembershipsRelations = relations(organizationMemberships, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [organizationMemberships.orgId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [organizationMemberships.userId],
+    references: [users.id],
+  }),
+}));
+
+export const organizationInvitationsRelations = relations(organizationInvitations, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [organizationInvitations.orgId],
+    references: [organizations.id],
+  }),
+  invitedByUser: one(users, {
+    fields: [organizationInvitations.invitedByUserId],
+    references: [users.id],
+  }),
 }));
 
 export const importSourcesRelations = relations(importSources, ({ one, many }) => ({
