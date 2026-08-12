@@ -17,6 +17,7 @@ export interface UserSessionPayload {
   role: "owner" | "manager" | "maintenance" | "read_only";
   email: string;
   name: string;
+  tokenVersion: number;
 }
 
 export function generateToken(payload: UserSessionPayload): string {

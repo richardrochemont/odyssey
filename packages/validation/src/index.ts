@@ -84,6 +84,20 @@ export const UserSignUpSchema = z.object({
 });
 export type UserSignUpInput = z.infer<typeof UserSignUpSchema>;
 
+export const UserChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  confirmPassword: z.string().min(1, "Password confirmation is required"),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+export type UserChangePasswordInput = z.infer<typeof UserChangePasswordSchema>;
+
 // Property
 export const PropertyCreateSchema = z.object({
   address: z.string().min(5, "Address must be at least 5 characters"),

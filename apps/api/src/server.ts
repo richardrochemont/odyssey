@@ -1,5 +1,6 @@
 import fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import * as dotenv from "dotenv";
@@ -29,14 +30,26 @@ const redis = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
 
 async function startServer() {
   const app = fastify({
+    requestIdHeader: "x-request-id",
     logger: {
-      transport: {
+      redact: [
+        "req.headers.authorization",
+        "req.headers.cookie",
+        "*.password",
+        "*.passwordHash",
+        "*.token",
+        "*.jwtSecret",
+        "*.databaseUrl",
+        "*.apiKey",
+        "*.secret",
+      ],
+      transport: process.env.NODE_ENV !== "production" ? {
         target: "pino-pretty",
         options: {
           translateTime: "HH:MM:ss Z",
           ignore: "pid,hostname",
         },
-      },
+      } : undefined,
     },
   });
 
@@ -46,6 +59,24 @@ async function startServer() {
     origin: corsOrigin && corsOrigin.length > 0 ? corsOrigin : true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
+  });
+
+  // Production Security Assertion
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_AUTH_DIRECTORY === "true") {
+    throw new Error("FATAL SECURITY CONFIGURATION: ENABLE_DEV_AUTH_DIRECTORY must not be set to 'true' in production.");
+  }
+
+  // Rate Limiting (Redis-backed for cluster/production scalability)
+  await app.register(rateLimit, {
+    global: true,
+    max: 100,
+    timeWindow: "1 minute",
+    redis: redis,
+    allowList: ["/health", "/health/db", "/health/redis"],
+    errorResponseBuilder: () => ({
+      error: "Too Many Requests",
+      message: "Rate limit exceeded. Please try again later.",
+    }),
   });
 
   // Swagger Documentation Setup
@@ -88,9 +119,11 @@ async function startServer() {
         details: error.validation,
       });
     }
-    return reply.code(error.statusCode || 500).send({
-      error: error.name || "InternalServerError",
-      message: error.message || "An unexpected error occurred",
+    const statusCode = error.statusCode || 500;
+    const isProd = process.env.NODE_ENV === "production";
+    return reply.code(statusCode).send({
+      error: statusCode === 500 ? "InternalServerError" : error.name || "Error",
+      message: (isProd && statusCode === 500) ? "An unexpected error occurred" : (error.message || "An unexpected error occurred"),
     });
   });
 
