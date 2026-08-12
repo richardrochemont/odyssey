@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck, Loader2, Mail, Lock, User, Building, ChevronDown, ChevronUp } from "lucide-react";
 
 interface SeededUser {
   id: string;
@@ -13,11 +13,29 @@ interface SeededUser {
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [users, setUsers] = useState<SeededUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
+  
+  // App/View modes
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [showDevOptions, setShowDevOptions] = useState(false);
+  
+  // Loaded seed users for demo selector
+  const [seededUsers, setSeededUsers] = useState<SeededUser[]>([]);
+  
+  // Login form fields
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  
+  // Register form fields
+  const [registerName, setRegisterName] = useState("");
+  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [registerOrgName, setRegisterOrgName] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingSeedId, setSubmittingSeedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Discover seeded users for dev selector
   useEffect(() => {
     async function fetchUsers() {
       try {
@@ -25,18 +43,74 @@ export default function LoginPage() {
         const res = await fetch(`${apiUrl}/auth/users`);
         if (!res.ok) throw new Error("Failed to load developers credentials");
         const data = await res.json();
-        setUsers(data);
+        setSeededUsers(data);
       } catch (err: any) {
-        setError(err.message);
+        // Silently log or keep list empty in prod if dev endpoints are disabled
+        console.log("Seeded credentials discovery skipped/disabled.");
       } finally {
-        setIsLoading(false);
+        // finished fetching seeds
       }
     }
     fetchUsers();
   }, []);
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const res = await fetch(`${apiUrl}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Invalid email or password");
+      }
+
+      const session = await res.json();
+      login(session.token, session.user);
+    } catch (err: any) {
+      setError(err.message);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const res = await fetch(`${apiUrl}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: registerName,
+          email: registerEmail,
+          password: registerPassword,
+          orgName: registerOrgName,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Registration failed. Please try again.");
+      }
+
+      const session = await res.json();
+      login(session.token, session.user);
+    } catch (err: any) {
+      setError(err.message);
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSelectUser = async (user: SeededUser) => {
-    setIsSubmitting(user.id);
+    setSubmittingSeedId(user.id);
     setError(null);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -55,7 +129,7 @@ export default function LoginPage() {
       login(session.token, session.user);
     } catch (err: any) {
       setError(err.message);
-      setIsSubmitting(null);
+      setSubmittingSeedId(null);
     }
   };
 
@@ -67,62 +141,236 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white border border-border p-8 rounded-xl shadow-sm">
+    <main className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white border border-slate-200 p-8 rounded-2xl shadow-xl transition-all duration-300">
+        
         {/* Brand Header */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="bg-primary text-white p-3 rounded-xl mb-4">
+        <div className="flex flex-col items-center mb-8 text-center">
+          <div className="bg-primary text-white p-3 rounded-2xl mb-4 shadow-md shadow-primary/20">
             <ShieldCheck className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-serif font-bold tracking-tight text-primary">Odyssey</h1>
-          <p className="text-sm text-muted mt-1 text-center font-sans">
-            Local Developer Auth selector. Choose a seeded profile.
+          <h1 className="text-3xl font-serif font-bold tracking-tight text-primary">Odyssey</h1>
+          <p className="text-sm text-slate-500 mt-1 font-sans">
+            {mode === "login" ? "Sign in to manage your properties" : "Create your owner account & organization"}
           </p>
         </div>
 
         {error && (
-          <div className="bg-danger/10 border border-danger/25 text-danger px-4 py-3 rounded-lg text-sm mb-6">
-            {error}
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm mb-6 flex items-start gap-2 shadow-sm">
+            <span className="font-semibold">Error:</span>
+            <span>{error}</span>
           </div>
         )}
 
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-8 gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted font-medium">Discovering seeded credentials...</p>
-          </div>
+        {/* Auth Forms */}
+        {mode === "login" ? (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                Email Address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Mail className="h-4 w-4" />
+                </div>
+                <input
+                  type="email"
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <input
+                  type="password"
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 bg-primary hover:bg-primary/95 text-white font-medium rounded-xl shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-75"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
         ) : (
-          <div className="space-y-3">
-            {users.map((u) => {
-              const loadingThis = isSubmitting === u.id;
-              
-              return (
-                <button
-                  key={u.id}
-                  disabled={!!isSubmitting}
-                  onClick={() => handleSelectUser(u)}
-                  className={`w-full text-left p-4 border border-border rounded-lg hover:border-primary/50 hover:bg-background/50 transition-all flex items-center justify-between ${
-                    loadingThis ? "border-primary bg-primary/5" : ""
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground truncate">{u.name}</p>
-                    <p className="text-xs text-muted truncate">{u.email}</p>
-                    <p className="text-[10px] mt-1 text-primary/80 font-bold uppercase tracking-wider">
-                      {roleLabels[u.role] || u.role}
-                    </p>
-                  </div>
-                  {loadingThis && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
-                </button>
-              );
-            })}
-          </div>
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                Full Name
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <User className="h-4 w-4" />
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={registerName}
+                  onChange={(e) => setRegisterName(e.target.value)}
+                  placeholder="Genevieve Hearth"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                Email Address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Mail className="h-4 w-4" />
+                </div>
+                <input
+                  type="email"
+                  required
+                  value={registerEmail}
+                  onChange={(e) => setRegisterEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                Organization / Company Name
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Building className="h-4 w-4" />
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={registerOrgName}
+                  onChange={(e) => setRegisterOrgName(e.target.value)}
+                  placeholder="Odyssey Capital LLC"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={registerPassword}
+                  onChange={(e) => setRegisterPassword(e.target.value)}
+                  placeholder="•••••••• (Min. 6 characters)"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 bg-primary hover:bg-primary/95 text-white font-medium rounded-xl shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-75"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Account"
+              )}
+            </button>
+          </form>
         )}
 
-        <div className="mt-8 text-center text-xs text-muted">
-          <p>Local dev mode bypasses Clerk authentication.</p>
-          <p className="mt-1">All pre-seeded passwords are <code className="bg-background px-1.5 py-0.5 rounded font-mono">password123</code></p>
+        {/* View Switcher Toggle */}
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError(null);
+            }}
+            className="text-xs text-primary font-semibold hover:underline"
+          >
+            {mode === "login" ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+          </button>
         </div>
+
+        {/* Collapsible Demo Mode Section */}
+        {seededUsers.length > 0 && (
+          <div className="mt-8 pt-6 border-t border-slate-100">
+            <button
+              onClick={() => setShowDevOptions(!showDevOptions)}
+              className="w-full flex items-center justify-between text-xs text-slate-500 hover:text-slate-700 transition-colors font-medium"
+            >
+              <span>DEVELOPER DEMO PROFILES</span>
+              {showDevOptions ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </button>
+
+            {showDevOptions && (
+              <div className="mt-4 space-y-2.5">
+                <p className="text-[11px] text-slate-400">
+                  Select a pre-seeded developer profile to quickly skip authentication:
+                </p>
+                <div className="space-y-2">
+                  {seededUsers.map((u) => {
+                    const loadingThis = submittingSeedId === u.id;
+                    return (
+                      <button
+                        key={u.id}
+                        disabled={isSubmitting || !!submittingSeedId}
+                        onClick={() => handleSelectUser(u)}
+                        className={`w-full text-left p-3 border border-slate-100 rounded-xl hover:border-primary/30 hover:bg-slate-50/50 transition-all flex items-center justify-between ${
+                          loadingThis ? "border-primary bg-primary/5" : ""
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{u.name}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{u.email}</p>
+                          <p className="text-[9px] mt-0.5 text-primary font-bold uppercase tracking-wider">
+                            {roleLabels[u.role] || u.role}
+                          </p>
+                        </div>
+                        {loadingThis && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );

@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { db, users } from "@hearthlane/db";
+import { db, users, organizations } from "@hearthlane/db";
 import { eq } from "drizzle-orm";
 import { generateToken } from "../services/auth";
-import { UserSignInSchema } from "@hearthlane/validation";
+import { UserSignInSchema, UserSignUpSchema } from "@hearthlane/validation";
 import { createHash } from "node:crypto";
 
 function hashPassword(password: string): string {
@@ -85,5 +85,62 @@ export default async function authRoutes(fastify: FastifyInstance, _options: Fas
         orgId: user.orgId,
       },
     };
+  });
+
+  // Standard organization & user registration
+  fastify.post("/register", async (request, reply) => {
+    const parseResult = UserSignUpSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.code(400).send({
+        error: "Validation failed",
+        details: parseResult.error.flatten(),
+      });
+    }
+
+    const { name, email, password, orgName } = parseResult.data;
+
+    // Check if user already exists
+    const [existingUser] = await db.select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (existingUser) {
+      return reply.code(409).send({ error: "A user with this email already exists" });
+    }
+
+    // Create organization
+    const [org] = await db.insert(organizations).values({
+      name: orgName,
+    }).returning();
+
+    // Create user (first user gets the 'owner' role)
+    const passwordHash = hashPassword(password);
+    const [newUser] = await db.insert(users).values({
+      orgId: org.id,
+      email,
+      passwordHash,
+      name,
+      role: "owner",
+    }).returning();
+
+    const token = generateToken({
+      id: newUser.id,
+      orgId: org.id,
+      role: "owner",
+      email: newUser.email,
+      name: newUser.name,
+    });
+
+    return reply.code(201).send({
+      token,
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: "owner",
+        orgId: org.id,
+      },
+    });
   });
 }
