@@ -45,6 +45,10 @@ interface PropertyDetails {
   notes: string | null;
   buildings: Building[];
   units: Unit[];
+  estimatedValue?: number;
+  valuationDate?: string | null;
+  valuationSource?: string | null;
+  valuationNotes?: string | null;
 }
 
 export default function PropertyDetailsPage({ params }: { params: { id: string } }) {
@@ -73,6 +77,19 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
   const [unitBuildingId, setUnitBuildingId] = useState("");
 
   const [error, setError] = useState<string | null>(null);
+
+  // Edit Property Form states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editNickname, setEditNickname] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editPropertyType, setEditPropertyType] = useState("");
+  const [editOwnership, setEditOwnership] = useState(100);
+  const [editAcquisitionDate, setEditAcquisitionDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editEstimatedValue, setEditEstimatedValue] = useState("");
+  const [editValuationDate, setEditValuationDate] = useState("");
+  const [editValuationSource, setEditValuationSource] = useState("");
+  const [editValuationNotes, setEditValuationNotes] = useState("");
 
   const fetchDetails = async () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -140,6 +157,44 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
       queryClient.invalidateQueries({ queryKey: ["property-details", propertyId, token] });
     },
   });
+
+  const updatePropertyMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const res = await fetch(`${apiUrl}/properties/${propertyId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to update property details");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["property-details", propertyId, token] });
+      setShowEditModal(false);
+    },
+    onError: (err: any) => setError(err.message),
+  });
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    updatePropertyMutation.mutate({
+      nickname: editNickname,
+      address: editAddress,
+      propertyType: editPropertyType,
+      ownershipPercentage: Number(editOwnership),
+      acquisitionDate: editAcquisitionDate,
+      notes: editNotes,
+      estimatedValue: editEstimatedValue ? Number(editEstimatedValue) : 0,
+      valuationDate: editValuationDate || null,
+      valuationSource: editValuationSource || null,
+      valuationNotes: editValuationNotes || null,
+    });
+  };
 
   const createUnitMutation = useMutation({
     mutationFn: async (payload: any) => {
@@ -211,7 +266,7 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
     setUnitNumber(unit.unitNumber);
     setUnitStatus(unit.status);
     setUnitType(unit.type);
-    setUnitRent(String(unit.monthlyRent / 100));
+    setUnitRent(String(unit.monthlyRent));
     setUnitSize(unit.sizeSqFt ? String(unit.sizeSqFt) : "");
     setUnitBuildingId(unit.buildingId || "");
   };
@@ -317,6 +372,62 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
                   <p className="text-xs text-muted italic leading-relaxed">{details.notes}</p>
                 </div>
               )}
+            </div>
+
+            {/* Property Valuation Card */}
+            <div className="bg-white border border-border rounded-xl p-6 shadow-sm space-y-4 text-sm">
+              <div className="flex justify-between items-center border-b border-border pb-3">
+                <h3 className="font-bold text-foreground">Property Valuation</h3>
+                {!isReadOnly && !isMaintenance && (
+                  <button
+                    onClick={() => {
+                      setEditNickname(details.nickname);
+                      setEditAddress(details.address);
+                      setEditPropertyType(details.propertyType);
+                      setEditOwnership(details.ownershipPercentage);
+                      setEditAcquisitionDate(details.acquisitionDate ? new Date(details.acquisitionDate).toISOString().split('T')[0] : "");
+                      setEditNotes(details.notes || "");
+                      setEditEstimatedValue(details.estimatedValue ? String(details.estimatedValue) : "");
+                      setEditValuationDate(details.valuationDate ? new Date(details.valuationDate).toISOString().split('T')[0] : "");
+                      setEditValuationSource(details.valuationSource || "");
+                      setEditValuationNotes(details.valuationNotes || "");
+                      setShowEditModal(true);
+                    }}
+                    className="text-xs font-semibold text-primary hover:underline flex items-center gap-0.5"
+                  >
+                    <Edit className="h-3 w-3" /> Edit
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3.5 text-xs text-muted">
+                <div className="flex justify-between">
+                  <span>Estimated Value</span>
+                  <span className="font-semibold text-foreground">
+                    {details.estimatedValue 
+                      ? details.estimatedValue.toLocaleString("en-US", { style: "currency", currency: "USD" })
+                      : "—"}
+                  </span>
+                </div>
+                {details.valuationDate && (
+                  <div className="flex justify-between">
+                    <span>Valuation Date</span>
+                    <span className="text-foreground">{new Date(details.valuationDate).toLocaleDateString()}</span>
+                  </div>
+                )}
+                {details.valuationSource && (
+                  <div className="flex justify-between">
+                    <span>Valuation Source</span>
+                    <span className="text-foreground">{details.valuationSource}</span>
+                  </div>
+                )}
+                {details.valuationNotes && (
+                  <div className="bg-background p-3 rounded-lg border border-border mt-2 w-full col-span-2">
+                    <p className="font-bold text-foreground text-[10px] uppercase mb-1">Valuation Notes</p>
+                    <p className="text-xs italic leading-relaxed text-muted">{details.valuationNotes}</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Buildings Section */}
@@ -452,7 +563,7 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
                                   className="w-20 border border-border p-1 rounded bg-white text-xs"
                                 />
                               ) : (
-                                (unit.monthlyRent / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })
+                                unit.monthlyRent.toLocaleString("en-US", { style: "currency", currency: "USD" })
                               )}
                             </td>
                             <td className="py-3 px-3 text-right">
@@ -689,6 +800,171 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
                   </button>
                   <button type="submit" className="px-3 py-1.5 bg-primary text-white text-xs rounded font-semibold">
                     Add Unit
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* Edit Property Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl border border-border w-full max-w-lg overflow-hidden shadow-lg animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-border bg-background">
+                <h3 className="font-bold text-lg text-foreground">Edit Property</h3>
+                <p className="text-xs text-muted">Update details and valuations for {details.nickname}.</p>
+              </div>
+
+              <form onSubmit={handleEditSubmit}>
+                <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto font-sans">
+                  {error && (
+                    <div className="p-3 bg-danger/10 border border-danger/20 text-danger rounded-lg text-xs">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Nickname</label>
+                      <input
+                        type="text"
+                        required
+                        value={editNickname}
+                        onChange={(e) => setEditNickname(e.target.value)}
+                        placeholder="e.g. Oakridge Manor"
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Address</label>
+                      <input
+                        type="text"
+                        required
+                        value={editAddress}
+                        onChange={(e) => setEditAddress(e.target.value)}
+                        placeholder="Full Street Address"
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Property Type</label>
+                      <select
+                        value={editPropertyType}
+                        onChange={(e) => setEditPropertyType(e.target.value)}
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary h-9.5"
+                      >
+                        <option value="apartment_building">Apartment Building</option>
+                        <option value="multi_family">Multi Family</option>
+                        <option value="single_family">Single Family</option>
+                        <option value="condo">Condo</option>
+                        <option value="townhouse">Townhouse</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Ownership %</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        required
+                        value={editOwnership}
+                        onChange={(e) => setEditOwnership(Number(e.target.value))}
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Acquisition Date</label>
+                      <input
+                        type="date"
+                        required
+                        value={editAcquisitionDate}
+                        onChange={(e) => setEditAcquisitionDate(e.target.value)}
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-2 border-t border-border pt-4 mt-2">
+                      <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Property Valuation</h4>
+                    </div>
+
+                    <div className="col-span-2 grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-foreground uppercase mb-1">Estimated Value ($)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editEstimatedValue}
+                          onChange={(e) => setEditEstimatedValue(e.target.value)}
+                          placeholder="e.g. 1200000"
+                          className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-foreground uppercase mb-1">Valuation Date</label>
+                        <input
+                          type="date"
+                          value={editValuationDate}
+                          onChange={(e) => setEditValuationDate(e.target.value)}
+                          className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Valuation Source</label>
+                      <input
+                        type="text"
+                        value={editValuationSource}
+                        onChange={(e) => setEditValuationSource(e.target.value)}
+                        placeholder="e.g. Zillow, Appraisal"
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Valuation Notes</label>
+                      <textarea
+                        value={editValuationNotes}
+                        onChange={(e) => setEditValuationNotes(e.target.value)}
+                        placeholder="Optional valuation context..."
+                        rows={2}
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Notes</label>
+                      <textarea
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        placeholder="Optional operational details..."
+                        rows={3}
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 border-t border-border bg-background flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-4 py-2 border border-border text-sm font-semibold rounded-lg hover:bg-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatePropertyMutation.isPending}
+                    className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-1.5"
+                  >
+                    {updatePropertyMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Save Changes
                   </button>
                 </div>
               </form>

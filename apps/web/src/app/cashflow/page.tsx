@@ -281,7 +281,7 @@ export default function CashFlowPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Rent Collected</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${(totalCollected / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ${totalCollected.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Cumulated operational inflow</p>
           </div>
@@ -289,7 +289,7 @@ export default function CashFlowPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Delinquent / Overdue</p>
             <h3 className="text-2xl font-serif font-bold text-danger">
-              ${(totalOverdue / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ${totalOverdue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Rent balances outstanding</p>
           </div>
@@ -297,7 +297,7 @@ export default function CashFlowPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Upcoming Projected</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${(totalUpcoming / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ${totalUpcoming.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Rent scheduled in current leases</p>
           </div>
@@ -367,10 +367,10 @@ export default function CashFlowPage() {
                           {new Date(p.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                         </td>
                         <td className="px-6 py-4 text-right font-semibold">
-                          ${(p.amountDue / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          ${p.amountDue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4 text-right font-semibold">
-                          ${(p.amountReceived / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          ${p.amountReceived.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold">
                           <span
@@ -453,7 +453,7 @@ export default function CashFlowPage() {
                     if (l) {
                       setTenantId(l.primaryTenantId);
                       setUnitId(l.unitId);
-                      setAmountDue((l.monthlyRent / 100).toString());
+                      setAmountDue(l.monthlyRent.toString());
                       // Find property matching unit's parent property
                       const prop = properties.find((p) => p.nickname === l.propertyNickname);
                       if (prop) setPropertyId(prop.id);

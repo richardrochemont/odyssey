@@ -218,17 +218,17 @@ export default function ExpensesPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Expenses This Month</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${(totalExpensesMonth / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ${totalExpensesMonth.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </h3>
-            <p className="text-[11px] text-muted font-sans mt-1">Current calendar month outflows</p>
+            <p className="text-[11px] text-muted font-sans mt-1">Cash basis current month</p>
           </div>
 
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
-            <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Total Operating Expenses (YTD)</p>
+            <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Expenses YTD</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${(totalExpensesYTD / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ${totalExpensesYTD.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </h3>
-            <p className="text-[11px] text-muted font-sans mt-1">Accumulated operating ledger costs</p>
+            <p className="text-[11px] text-muted font-sans mt-1">Year to date accumulated</p>
           </div>
         </div>
 
@@ -314,8 +314,8 @@ export default function ExpensesPage() {
                         <td className="px-6 py-4 text-xs">
                           {new Date(e.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                         </td>
-                        <td className="px-6 py-4 text-right font-semibold">
-                          ${(e.amount / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        <td className="px-6 py-4 text-right font-semibold text-foreground">
+                          ${e.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4 text-xs text-muted max-w-[200px] truncate">{e.notes || "—"}</td>
                         {user?.role !== "read_only" && (

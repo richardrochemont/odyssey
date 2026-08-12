@@ -94,7 +94,7 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
         },
         body: JSON.stringify({
           context: "lease",
-          text: `Draft a renewal offer for tenant ${lease?.tenantName} whose lease ends on ${lease ? new Date(lease.endDate).toLocaleDateString() : ""}. Monthly rent is currently $${lease ? (lease.monthlyRent / 100).toLocaleString() : ""}.`,
+          text: `Draft a renewal offer for tenant ${lease?.tenantName} whose lease ends on ${lease ? new Date(lease.endDate).toLocaleDateString() : ""}. Monthly rent is currently $${lease ? lease.monthlyRent.toLocaleString() : ""}.`,
         }),
       });
       if (!res.ok) throw new Error("Failed to draft AI renewal offer");
@@ -141,7 +141,7 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
   const totalDueInvoices = leasePayments.filter((p) => p.status !== "upcoming").length;
 
   // Calculators for renewal review range (+5% to +10%)
-  const currentRentDollars = lease.monthlyRent / 100;
+  const currentRentDollars = lease.monthlyRent;
   const suggestedMin = Math.round(currentRentDollars * 1.05);
   const suggestedMax = Math.round(currentRentDollars * 1.10);
 
@@ -191,7 +191,7 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
           <div className="bg-white border border-border px-6 py-4 rounded-md shadow-sm text-right">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Outstanding Balance</p>
             <p className={`text-xl font-serif font-bold ${outstandingBalance > 0 ? "text-danger" : "text-foreground"}`}>
-              ${(outstandingBalance / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ${outstandingBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </p>
           </div>
         </div>
@@ -214,7 +214,7 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
                 <div>
                   <p className="font-bold text-muted uppercase tracking-wider text-[9px]">Security Deposit</p>
                   <p className="text-base font-semibold text-foreground mt-1 font-serif">
-                    {(lease.securityDeposit / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                    {lease.securityDeposit.toLocaleString("en-US", { style: "currency", currency: "USD" })}
                   </p>
                 </div>
 
@@ -276,7 +276,7 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
                       </div>
                       <div className="text-right flex items-center gap-3">
                         <div>
-                          <p className="font-semibold text-foreground">${(p.amountReceived / 100).toLocaleString()}</p>
+                          <p className="font-semibold text-foreground">${p.amountReceived.toLocaleString()}</p>
                           <p className="text-[9px] text-muted">Received</p>
                         </div>
                         <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] uppercase ${p.status === "paid" ? "bg-neutral-100 text-foreground" : "bg-danger/10 text-danger"}`}>

@@ -33,6 +33,10 @@ export const properties = pgTable("properties", {
   ownershipPercentage: integer("ownership_percentage").notNull().default(100), // e.g. 100
   acquisitionDate: timestamp("acquisition_date").notNull(),
   notes: text("notes"),
+  estimatedValue: integer("estimated_value").notNull().default(0),
+  valuationDate: timestamp("valuation_date"),
+  valuationSource: varchar("valuation_source", { length: 255 }),
+  valuationNotes: text("valuation_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),

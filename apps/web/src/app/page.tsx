@@ -25,6 +25,10 @@ interface Property {
   nickname: string;
   propertyType: string;
   units: Unit[];
+  estimatedValue?: number;
+  valuationDate?: string;
+  valuationSource?: string;
+  valuationNotes?: string;
 }
 
 interface Lease {
@@ -190,8 +194,8 @@ export default function PortfolioOverviewPage() {
 
   // --- Calculations ---
 
-  // 1. Portfolio Value (Acquisition baseline: $4.2M)
-  const portfolioValue = "$4,250,000";
+  // 1. Portfolio Value (Sum of property estimated values)
+  const portfolioValue = properties.reduce((sum, p) => sum + (p.estimatedValue || 0), 0);
 
   // 2. Monthly Rental Income (active leases rent sum)
   const activeLeases = leases.filter((l) => l.status === "active");
@@ -268,7 +272,9 @@ export default function PortfolioOverviewPage() {
           {/* Portfolio Value */}
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Portfolio Value</p>
-            <h3 className="text-2xl font-serif font-bold text-foreground">{portfolioValue}</h3>
+            <h3 className="text-2xl font-serif font-bold text-foreground">
+              ${portfolioValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Estimated asset base</p>
           </div>
 
@@ -276,7 +282,7 @@ export default function PortfolioOverviewPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Monthly Rent</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${(monthlyRentalIncome / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ${monthlyRentalIncome.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Active lease values</p>
           </div>
@@ -285,7 +291,7 @@ export default function PortfolioOverviewPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Net Cash Flow</p>
             <h3 className={`text-2xl font-serif font-bold ${netCashFlow < 0 ? "text-danger" : "text-foreground"}`}>
-              ${(netCashFlow / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              ${netCashFlow.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">This month cash basis</p>
           </div>
@@ -421,7 +427,7 @@ export default function PortfolioOverviewPage() {
                     <div>
                       <h4 className="text-sm font-semibold font-sans">Operating Expense Spikes</h4>
                       <p className="text-xs text-muted font-sans mt-1">
-                        A large expense of <strong>${(e.amount / 100).toLocaleString()}</strong> was recorded for <strong>{e.category.replace(/_/g, ' ')}</strong> at {e.propertyNickname}.
+                        A large expense of <strong>${e.amount.toLocaleString()}</strong> was recorded for <strong>{e.category.replace(/_/g, ' ')}</strong> at {e.propertyNickname}.
                       </p>
                       <Link
                         href={`/expenses`}
@@ -456,7 +462,7 @@ export default function PortfolioOverviewPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-danger font-serif">
-                        +${((p.amountDue - p.amountReceived) / 100).toLocaleString()}
+                        +${(p.amountDue - p.amountReceived).toLocaleString()}
                       </p>
                       <Link
                         href="/cashflow"
@@ -543,7 +549,7 @@ export default function PortfolioOverviewPage() {
                 ).map(([category, amount]) => (
                   <div key={category} className="flex justify-between py-2 text-xs font-sans">
                     <span className="capitalize text-muted">{category}</span>
-                    <span className="font-semibold text-foreground">${(amount as number / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    <span className="font-semibold text-foreground">${(amount as number).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                   </div>
                 ))}
                 {expenses.filter(e => {

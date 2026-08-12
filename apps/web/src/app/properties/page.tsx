@@ -52,6 +52,10 @@ export default function PropertiesPage() {
   const [ownershipPercentage, setOwnershipPercentage] = useState(100);
   const [acquisitionDate, setAcquisitionDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [estimatedValue, setEstimatedValue] = useState("");
+  const [valuationDate, setValuationDate] = useState("");
+  const [valuationSource, setValuationSource] = useState("");
+  const [valuationNotes, setValuationNotes] = useState("");
 
   const fetchProperties = async () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -95,6 +99,10 @@ export default function PropertiesPage() {
       setOwnershipPercentage(100);
       setAcquisitionDate("");
       setNotes("");
+      setEstimatedValue("");
+      setValuationDate("");
+      setValuationSource("");
+      setValuationNotes("");
     },
     onError: (err: any) => {
       setError(err.message);
@@ -111,6 +119,10 @@ export default function PropertiesPage() {
       ownershipPercentage: Number(ownershipPercentage),
       acquisitionDate,
       notes,
+      estimatedValue: estimatedValue ? Number(estimatedValue) : 0,
+      valuationDate: valuationDate || null,
+      valuationSource: valuationSource || null,
+      valuationNotes: valuationNotes || null,
     });
   };
 
@@ -296,6 +308,56 @@ export default function PropertiesPage() {
                         required
                         value={acquisitionDate}
                         onChange={(e) => setAcquisitionDate(e.target.value)}
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-2 border-t border-border pt-4 mt-2">
+                      <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Property Valuation</h4>
+                    </div>
+
+                    <div className="col-span-2 grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-foreground uppercase mb-1">Estimated Value ($)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={estimatedValue}
+                          onChange={(e) => setEstimatedValue(e.target.value)}
+                          placeholder="e.g. 1200000"
+                          className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-foreground uppercase mb-1">Valuation Date</label>
+                        <input
+                          type="date"
+                          value={valuationDate}
+                          onChange={(e) => setValuationDate(e.target.value)}
+                          className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Valuation Source</label>
+                      <input
+                        type="text"
+                        value={valuationSource}
+                        onChange={(e) => setValuationSource(e.target.value)}
+                        placeholder="e.g. Zillow, Appraisal"
+                        className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-foreground uppercase mb-1">Valuation Notes</label>
+                      <textarea
+                        value={valuationNotes}
+                        onChange={(e) => setValuationNotes(e.target.value)}
+                        placeholder="Optional valuation context..."
+                        rows={2}
                         className="w-full text-sm border border-border p-2 rounded-lg bg-background focus:outline-primary"
                       />
                     </div>

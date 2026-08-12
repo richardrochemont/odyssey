@@ -13,7 +13,10 @@ export default async function propertyRoutes(fastify: FastifyInstance, _options:
   }, async (request, _reply) => {
     const user = request.user!;
     const properties = await service.listProperties(user.orgId);
-    return properties;
+    return properties.map((p) => ({
+      ...p,
+      estimatedValue: p.estimatedValue / 100,
+    }));
   });
 
   // Get property details (including buildings, units)
@@ -26,7 +29,10 @@ export default async function propertyRoutes(fastify: FastifyInstance, _options:
     if (!details) {
       return reply.code(404).send({ error: "Property not found" });
     }
-    return details;
+    return {
+      ...details,
+      estimatedValue: details.estimatedValue / 100,
+    };
   });
 
   // Create property
@@ -39,7 +45,10 @@ export default async function propertyRoutes(fastify: FastifyInstance, _options:
       return reply.code(400).send({ error: "Validation failed", details: parseResult.error.flatten() });
     }
     const property = await service.createProperty(user.orgId, user.id, parseResult.data);
-    return reply.code(211).code(201).send(property);
+    return reply.code(201).send({
+      ...property,
+      estimatedValue: property.estimatedValue / 100,
+    });
   });
 
   // Update property
@@ -54,7 +63,10 @@ export default async function propertyRoutes(fastify: FastifyInstance, _options:
     }
     try {
       const updated = await service.updateProperty(user.orgId, user.id, id, parseResult.data);
-      return updated;
+      return {
+        ...updated,
+        estimatedValue: updated.estimatedValue / 100,
+      };
     } catch (e: any) {
       return reply.code(404).send({ error: e.message });
     }

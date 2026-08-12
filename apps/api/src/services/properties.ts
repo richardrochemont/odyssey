@@ -21,7 +21,7 @@ export async function listProperties(orgId: string) {
     result.push({
       ...p,
       buildings: propertyBuildings,
-      units: propertyUnits,
+      units: propertyUnits.map(u => ({ ...u, monthlyRent: u.monthlyRent / 100 })),
     });
   }
   return result;
@@ -45,7 +45,7 @@ export async function getPropertyDetails(orgId: string, id: string) {
   return {
     ...property,
     buildings: propertyBuildings,
-    units: propertyUnits,
+    units: propertyUnits.map(u => ({ ...u, monthlyRent: u.monthlyRent / 100 })),
   };
 }
 
@@ -58,6 +58,10 @@ export async function createProperty(orgId: string, userId: string, input: Prope
     ownershipPercentage: input.ownershipPercentage,
     acquisitionDate: new Date(input.acquisitionDate),
     notes: input.notes || null,
+    estimatedValue: Math.round((input.estimatedValue || 0) * 100),
+    valuationDate: input.valuationDate ? new Date(input.valuationDate) : null,
+    valuationSource: input.valuationSource || null,
+    valuationNotes: input.valuationNotes || null,
   }).returning();
 
   await logAction({
@@ -91,6 +95,10 @@ export async function updateProperty(
   if (input.ownershipPercentage !== undefined) updateFields.ownershipPercentage = input.ownershipPercentage;
   if (input.acquisitionDate !== undefined) updateFields.acquisitionDate = new Date(input.acquisitionDate);
   if (input.notes !== undefined) updateFields.notes = input.notes || null;
+  if (input.estimatedValue !== undefined) updateFields.estimatedValue = Math.round(input.estimatedValue * 100);
+  if (input.valuationDate !== undefined) updateFields.valuationDate = input.valuationDate ? new Date(input.valuationDate) : null;
+  if (input.valuationSource !== undefined) updateFields.valuationSource = input.valuationSource || null;
+  if (input.valuationNotes !== undefined) updateFields.valuationNotes = input.valuationNotes || null;
   updateFields.updatedAt = new Date();
 
   const [updated] = await db.update(properties)
@@ -204,7 +212,10 @@ export async function createUnit(orgId: string, userId: string, input: UnitCreat
     newState: unit,
   });
 
-  return unit;
+  return {
+    ...unit,
+    monthlyRent: unit.monthlyRent / 100,
+  };
 }
 
 export async function updateUnit(
@@ -243,7 +254,10 @@ export async function updateUnit(
     newState: updated,
   });
 
-  return updated;
+  return {
+    ...updated,
+    monthlyRent: updated.monthlyRent / 100,
+  };
 }
 
 export async function archiveUnit(orgId: string, userId: string, id: string) {

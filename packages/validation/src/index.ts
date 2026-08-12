@@ -92,6 +92,10 @@ export const PropertyCreateSchema = z.object({
   ownershipPercentage: z.number().min(0).max(100).default(100),
   acquisitionDate: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid acquisition date"),
   notes: z.string().optional(),
+  estimatedValue: z.number().min(0).optional().default(0),
+  valuationDate: z.string().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid valuation date").optional().nullable(),
+  valuationSource: z.string().max(255).optional().nullable(),
+  valuationNotes: z.string().optional().nullable(),
 });
 export type PropertyCreateInput = z.infer<typeof PropertyCreateSchema>;
 
