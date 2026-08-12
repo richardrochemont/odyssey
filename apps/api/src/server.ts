@@ -8,6 +8,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@odyssey/db";
 import IORedis from "ioredis";
 
+import { validateAppUrl } from "./config/appUrl";
+
 // Load environment variables
 dotenv.config({ path: "../../.env" });
 
@@ -75,9 +77,7 @@ async function startServer() {
   if (process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_AUTH_DIRECTORY === "true") {
     throw new Error("FATAL SECURITY CONFIGURATION: ENABLE_DEV_AUTH_DIRECTORY must not be set to 'true' in production.");
   }
-  if (process.env.NODE_ENV === "production" && !process.env.APP_URL) {
-    app.log.error("[WARNING] APP_URL environment variable is missing in production. Defaulting to fallback.");
-  }
+  validateAppUrl(process.env.APP_URL, process.env.NODE_ENV);
 
   // Rate Limiting (Redis-backed for cluster/production scalability)
   await app.register(rateLimit, {

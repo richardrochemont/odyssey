@@ -26,9 +26,10 @@ Detailed technical specs are available in the `docs` directory:
 
 - [Product Spec](file:///Users/jake/Desktop/Rich%20Real%20Estate/docs/product-spec.md)
 - [Domain Models](file:///Users/jake/Desktop/Rich%20Real%20Estate/docs/domain-model.md)
-- [API Contracts](file:///Users/jake/Desktop/Rich%20Real%20Estate/docs/api-contracts.md)
-- [Security Matrix](file:///Users/jake/Desktop/Rich%20Real%20Estate/docs/security.md)
-- [Railway Deployment Notes](file:///Users/jake/Desktop/Rich%20Real%20Estate/docs/railway-notes.md)
+- [API Contracts](file:///Users/jake/Desktop/odyssey/odyssey/docs/api-contracts.md)
+- [Security Matrix](file:///Users/jake/Desktop/odyssey/odyssey/docs/security.md)
+- [Railway Deployment Notes](file:///Users/jake/Desktop/odyssey/odyssey/docs/railway-notes.md)
+- [Transactional Email Setup](file:///Users/jake/Desktop/odyssey/odyssey/docs/transactional-email.md)
 
 ---
 

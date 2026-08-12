@@ -9,6 +9,8 @@ import {
   MemberRoleUpdateSchema,
 } from "@odyssey/validation";
 import { randomBytes, createHash } from "node:crypto";
+import { getInvitationUrl } from "../config/appUrl";
+import { getTransactionalEmailProvider } from "../services/email";
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -410,17 +412,69 @@ export default async function workspaceRoutes(fastify: FastifyInstance, _options
       newState: { email: normalizedEmail, role, expiresAt },
     });
 
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
-    const invitationUrl = `${appUrl}/invite#token=${rawToken}`;
+    const invitationUrl = getInvitationUrl(rawToken);
+
+    // Fetch org details for email template
+    const [orgInfo] = await db.select({ name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+
+    const emailProvider = getTransactionalEmailProvider();
+    const sendResult = await emailProvider.sendWorkspaceInvitation({
+      to: normalizedEmail,
+      inviterName: request.user!.name,
+      workspaceName: orgInfo?.name || "Odyssey Workspace",
+      role,
+      expiresAt,
+      invitationUrl,
+    });
+
+    let finalStatus = invitation.status;
+    let responseMessage: string;
+
+    if (sendResult.deliveryStatus === "accepted") {
+      finalStatus = "sent";
+      await db.update(organizationInvitations)
+        .set({
+          status: "sent",
+          deliveryStatus: "accepted",
+          sentAt: sendResult.sentAt || new Date(),
+          providerMessageId: sendResult.providerMessageId,
+          lastDeliveryError: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(organizationInvitations.id, invitation.id));
+      responseMessage = "Invitation created and email sent successfully.";
+    } else if (sendResult.deliveryStatus === "skipped") {
+      await db.update(organizationInvitations)
+        .set({
+          deliveryStatus: "skipped",
+          lastDeliveryError: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(organizationInvitations.id, invitation.id));
+      responseMessage = "Invitation link generated. Email delivery is disabled. Copy the one-time link to share it manually.";
+    } else {
+      await db.update(organizationInvitations)
+        .set({
+          deliveryStatus: "failed",
+          lastDeliveryError: sendResult.errorCode || "ERR_PROVIDER_FAILED",
+          updatedAt: new Date(),
+        })
+        .where(eq(organizationInvitations.id, invitation.id));
+      responseMessage = "Invitation link generated. Email delivery failed. Copy the one-time link to share it manually.";
+    }
 
     return reply.code(201).send({
-      message: "Invitation created successfully. Display raw invitation link to user once only.",
+      message: responseMessage,
       invitationUrl,
       invitation: {
         id: invitation.id,
         email: invitation.email,
         role: invitation.role,
-        status: invitation.status,
+        status: finalStatus,
+        deliveryStatus: sendResult.deliveryStatus,
         expiresAt: invitation.expiresAt,
         createdAt: invitation.createdAt,
       },

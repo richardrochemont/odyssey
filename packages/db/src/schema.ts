@@ -57,6 +57,10 @@ export const organizationInvitations = pgTable(
     tokenHash: varchar("token_hash", { length: 255 }).notNull(),
     note: text("note"),
     status: varchar("status", { length: 50 }).notNull().default("pending"), // 'draft' | 'pending' | 'sent' | 'accepted' | 'expired' | 'revoked'
+    deliveryStatus: varchar("delivery_status", { length: 50 }).notNull().default("not_sent"), // 'not_sent' | 'skipped' | 'accepted' | 'delivered' | 'bounced' | 'complained' | 'failed'
+    providerMessageId: varchar("provider_message_id", { length: 255 }),
+    sentAt: timestamp("sent_at"),
+    lastDeliveryError: text("last_delivery_error"),
     expiresAt: timestamp("expires_at").notNull(),
     acceptedAt: timestamp("accepted_at"),
     revokedAt: timestamp("revoked_at"),

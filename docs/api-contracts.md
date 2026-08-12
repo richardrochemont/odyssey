@@ -25,6 +25,28 @@ The JWT contains:
   - Body: `{ email, password }`
   - Response: `{ token, user: { id, name, role, orgId } }`
 
+### 1b. Workspaces & Team Onboarding (`/workspaces`)
+- `POST /workspaces`: Creates new workspace (Owner).
+- `GET /workspaces`: Lists caller's active workspace memberships.
+- `POST /workspaces/:orgId/invitations`: Creates team invitation and triggers transactional email pipeline (Owner only).
+  - Body: `{ email, role, note?, confirmOwnerInvite? }`
+  - Response:
+    ```json
+    {
+      "message": "Invitation link generated. Email delivery is disabled. Copy the one-time link to share it manually.",
+      "invitationUrl": "https://odyssey.investments/invite#token=...",
+      "invitation": {
+        "id": "uuid",
+        "email": "user@example.com",
+        "role": "manager",
+        "status": "pending",
+        "deliveryStatus": "skipped",
+        "expiresAt": "2026-08-19T16:00:00.000Z",
+        "createdAt": "2026-08-12T16:00:00.000Z"
+      }
+    }
+    ```
+
 ### 2. Property Mappings (`/properties`)
 - `GET /properties`: Lists properties with nested buildings and units.
 - `GET /properties/:id`: Detailed Property information.

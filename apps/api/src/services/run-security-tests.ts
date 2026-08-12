@@ -169,7 +169,15 @@ async function runSecuritySuite() {
   console.log("   -> Passed! (403 returned)");
 
   await app.close();
-  console.log("\nAll Fastify Injection Security Tests Passed Successfully!");
+
+  // Run APP_URL & Email Abstraction Unit Test Suites
+  const { runAppUrlTests } = await import("../config/appUrl.test");
+  await runAppUrlTests();
+
+  const { runEmailTests } = await import("./email.test");
+  await runEmailTests();
+
+  console.log("\nAll Fastify Injection & Service Unit Security Tests Passed Successfully!");
 }
 
 runSecuritySuite().catch((err) => {

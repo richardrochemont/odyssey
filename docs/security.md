@@ -35,3 +35,18 @@ Database queries are written using **Drizzle ORM** which parameterizes values by
 ## 5. Input Validation
 
 All incoming payloads are validated at the API route boundary using **Zod schemas** shared through `packages/validation`. This enforces structure, checks lengths, formats emails, parses dates, and sanitizes numeric inputs before they reach database queries.
+
+## 6. Canonical Origin & Link Security
+
+- Server-side `APP_URL` is validated strictly at API startup.
+- In production (`NODE_ENV=production`), `APP_URL` is required, must use HTTPS, and cannot be set to `localhost` or `127.0.0.1`.
+- Invitation URLs are constructed exclusively from `APP_URL` using fragment parameters (`${APP_URL}/invite#token=${rawToken}`).
+- URLs never derive from request `Host` headers or `NEXT_PUBLIC_APP_URL`.
+
+## 7. Secure Invitation Tokens & Transactional Email
+
+- **Token Storage**: Raw invitation tokens exist only in memory during creation. Databases store only cryptographic `tokenHash` (SHA-256).
+- **Log Sanitation**: Raw tokens, token hashes, full invitation URLs, and raw provider error responses are strictly redacted from logs, error fields, and audit trails.
+- **Safety Gate**: Transactional email defaults to `EMAIL_ENABLED=false` using `NoopEmailProvider`. No real emails are sent and no provider credentials are required unless explicitly activated.
+- **State Isolation**: Invitation status (`pending`, `sent`, `accepted`, etc.) is kept separate from provider `deliveryStatus` (`not_sent`, `skipped`, `accepted`, `delivered`, `bounced`, `complained`, `failed`).
+
