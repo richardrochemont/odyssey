@@ -5,7 +5,7 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import * as dotenv from "dotenv";
 import { sql } from "drizzle-orm";
-import { db } from "@odyssey/db";
+import { db, databaseUrl } from "@odyssey/db";
 import IORedis from "ioredis";
 
 import { validateAppUrl } from "./config/appUrl";
@@ -162,6 +162,14 @@ async function startServer() {
 
   // Database connectivity check
   app.get("/health/db", async (_request, reply) => {
+    if (process.env.NODE_ENV === "production" && databaseUrl.includes("localhost")) {
+      return reply.code(503).send({
+        status: "unhealthy",
+        database: "disconnected",
+        error: "Missing DATABASE_URL environment variable in production (currently falling back to localhost)",
+        timestamp: new Date().toISOString()
+      });
+    }
     try {
       await db.execute(sql`select 1`);
       return { status: "healthy", database: "connected", timestamp: new Date().toISOString() };
