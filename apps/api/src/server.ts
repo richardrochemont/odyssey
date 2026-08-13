@@ -9,6 +9,7 @@ import { db, databaseUrl } from "@odyssey/db";
 import IORedis from "ioredis";
 
 import { validateAppUrl } from "./config/appUrl";
+import { validateEmailConfig } from "./services/email";
 
 // Load environment variables
 dotenv.config({ path: "../../.env" });
@@ -78,6 +79,7 @@ async function startServer() {
     throw new Error("FATAL SECURITY CONFIGURATION: ENABLE_DEV_AUTH_DIRECTORY must not be set to 'true' in production.");
   }
   validateAppUrl(process.env.APP_URL, process.env.NODE_ENV);
+  validateEmailConfig();
 
   // Rate Limiting (Redis-backed for cluster/production scalability)
   await app.register(rateLimit, {

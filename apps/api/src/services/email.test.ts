@@ -1,7 +1,7 @@
 import * as assert from "node:assert";
 import { NoopEmailProvider } from "./email/noopProvider";
 import { ResendEmailProvider } from "./email/resendProvider";
-import { getTransactionalEmailProvider } from "./email";
+import { getTransactionalEmailProvider, validateEmailConfig } from "./email";
 import { buildWorkspaceInvitationEmail } from "./email/templates/workspaceInvitation";
 
 export async function runEmailTests() {
@@ -24,7 +24,7 @@ export async function runEmailTests() {
   assert.strictEqual(noopResult.providerMessageId, undefined);
   assert.strictEqual(noopResult.errorCode, undefined);
 
-  // 2. ResendEmailProvider with EMAIL_ENABLED=false test
+  // 2a. ResendEmailProvider with EMAIL_ENABLED=false test
   const oldEnv = { ...process.env };
   try {
     process.env.EMAIL_PROVIDER = "resend";
@@ -32,12 +32,42 @@ export async function runEmailTests() {
     delete process.env.RESEND_API_KEY; // Verify key is not required when disabled
 
     const provider = getTransactionalEmailProvider();
-    assert.ok(provider instanceof ResendEmailProvider, "Should instantiate ResendEmailProvider");
+    assert.ok(provider instanceof NoopEmailProvider, "Should return NoopEmailProvider when EMAIL_ENABLED is false");
 
     const disabledResult = await provider.sendWorkspaceInvitation(testPayload);
     assert.strictEqual(disabledResult.deliveryStatus, "skipped");
     assert.strictEqual(disabledResult.providerMessageId, undefined);
     assert.strictEqual(disabledResult.errorCode, undefined);
+  } finally {
+    process.env = oldEnv;
+  }
+
+  // 2b. Startup validation failure test when EMAIL_ENABLED=true but required variables are missing
+  try {
+    process.env.EMAIL_PROVIDER = "resend";
+    process.env.EMAIL_ENABLED = "true";
+    delete process.env.RESEND_API_KEY;
+    delete process.env.EMAIL_FROM;
+
+    assert.throws(
+      () => validateEmailConfig(),
+      /FATAL EMAIL CONFIGURATION/,
+      "validateEmailConfig must throw when required Resend variables are missing"
+    );
+  } finally {
+    process.env = oldEnv;
+  }
+
+  // 2c. getTransactionalEmailProvider returns ResendEmailProvider when EMAIL_PROVIDER=resend and EMAIL_ENABLED=true
+  try {
+    process.env.EMAIL_PROVIDER = "resend";
+    process.env.EMAIL_ENABLED = "true";
+    process.env.RESEND_API_KEY = "re_test_key";
+    process.env.EMAIL_FROM = "invitations@odyssey.investments";
+
+    validateEmailConfig(); // Should not throw when valid
+    const provider = getTransactionalEmailProvider();
+    assert.ok(provider instanceof ResendEmailProvider, "Should instantiate ResendEmailProvider when EMAIL_ENABLED=true");
   } finally {
     process.env = oldEnv;
   }

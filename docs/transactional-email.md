@@ -20,7 +20,9 @@ To fix the production invitation link issue and configure transactional email, s
 | `EMAIL_REPLY_TO` | `support@odyssey.investments` | Reply-to destination address. | Optional |
 
 > [!IMPORTANT]
-> **Production Safety Gate**: Setting `EMAIL_PROVIDER=resend` while keeping `EMAIL_ENABLED=false` will **NOT** trigger external HTTP calls to Resend, will **NOT** validate credentials at startup, and will return `{ deliveryStatus: "skipped" }`.
+> **Production Safety Gate & Startup Validation**:
+> 1. Setting `EMAIL_PROVIDER=resend` while keeping `EMAIL_ENABLED=false` (or unset) defaults to `NoopEmailProvider`, returning `{ deliveryStatus: "skipped" }` without external HTTP calls.
+> 2. When `EMAIL_PROVIDER=resend` AND `EMAIL_ENABLED=true`, API startup validates that `RESEND_API_KEY` and `EMAIL_FROM` are set. If missing, startup fails safely (`FATAL EMAIL CONFIGURATION`).
 
 ### Vercel Web Application Variables (Production Frontend)
 
