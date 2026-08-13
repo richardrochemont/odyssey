@@ -85,12 +85,17 @@ export default function LoginPage() {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
       const res = await fetch(`${apiUrl}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -105,7 +110,13 @@ export default function LoginPage() {
       const session = await res.json();
       login(session.token, session.user);
     } catch (err: any) {
-      setError(err.message || "Invalid email or password");
+      if (err.name === "AbortError") {
+        setError("Connection timed out. Please check your network connection and try again.");
+      } else {
+        setError(err.message || "Invalid email or password");
+      }
+    } finally {
+      clearTimeout(timeoutId);
       setIsSubmitting(false);
     }
   };
@@ -114,6 +125,10 @@ export default function LoginPage() {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
       const body: Record<string, any> = {
@@ -132,6 +147,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -142,7 +158,13 @@ export default function LoginPage() {
       const session = await res.json();
       login(session.token, session.user);
     } catch (err: any) {
-      setError(err.message);
+      if (err.name === "AbortError") {
+        setError("Connection timed out. Please check your network connection and try again.");
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      clearTimeout(timeoutId);
       setIsSubmitting(false);
     }
   };

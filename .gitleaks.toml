@@ -1,4 +1,4 @@
-# Gitleaks Configuration for Odyssey Monorepo
+j# Gitleaks Configuration for Odyssey Monorepo
 title = "Gitleaks secret scanning config"
 
 [allowlist]

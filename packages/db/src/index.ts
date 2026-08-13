@@ -4,11 +4,18 @@ import * as schema from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL || "postgres://postgres:password@localhost:5432/odyssey";
 
-// Railway's internal Postgres network (DATABASE_URL) does not require SSL. Set DATABASE_SSL=true if
-// connecting over a public/external URL that enforces it (e.g. DATABASE_PUBLIC_URL from a local machine).
+const requiresSsl =
+  process.env.DATABASE_SSL === "true" ||
+  databaseUrl.includes(".rlwy.net") ||
+  databaseUrl.includes("sslmode=require") ||
+  databaseUrl.includes("proxy.rlwy.net");
+
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+  ssl: requiresSsl ? { rejectUnauthorized: false } : undefined,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
+  max: 10,
 });
 
 export const db = drizzle(pool, { schema });
