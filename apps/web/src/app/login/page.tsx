@@ -16,11 +16,11 @@ export default function LoginPage() {
   
   // App/View modes
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [showDevOptions, setShowDevOptions] = useState(false);
-  
+  const [showDevOptions, setShowDevOptions] = useState(true);
+
   // Loaded seed users for demo selector
   const [seededUsers, setSeededUsers] = useState<SeededUser[]>([]);
-  
+
   // Login form fields
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -36,35 +36,10 @@ export default function LoginPage() {
   const [submittingSeedId, setSubmittingSeedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Process query parameters client-side
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const emailParam = params.get("email");
-      const registerParam = params.get("register");
-      const tokenParam = params.get("token");
-      const expiredParam = params.get("expired");
-
-      if (expiredParam === "true") {
-        setError("Your session has expired. Please sign in again.");
-      }
-      if (emailParam) {
-        setLoginEmail(emailParam);
-        setRegisterEmail(emailParam);
-      }
-      if (registerParam === "true") {
-        setMode("register");
-      }
-      if (tokenParam) {
-        setInvitationToken(tokenParam);
-      }
-    }
-  }, []);
-
   // Discover seeded users for dev selector (development only)
   useEffect(() => {
     async function fetchUsers() {
-      if (!showDevOptions || process.env.NODE_ENV === "production") {
+      if (process.env.NODE_ENV === "production") {
         return;
       }
       try {

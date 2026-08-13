@@ -1,15 +1,17 @@
-import { pgTable, uuid, varchar, text, integer, boolean, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, boolean, timestamp, date, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // 1. Organizations (Multi-tenant scope)
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),
-  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  slug: varchar("slug", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
-});
+}, (table) => ({
+  organizationsSlugUnique: uniqueIndex("organizations_slug_unique").on(table.slug),
+}));
 
 // 2. Users (Role-based access within Organization)
 export const users = pgTable("users", {
@@ -102,9 +104,11 @@ export const importRows = pgTable("import_rows", {
   runId: uuid("run_id").references(() => importRuns.id).notNull(),
   rowNumber: integer("row_number").notNull(),
   rawData: jsonb("raw_data").notNull(),
-  status: varchar("status", { length: 50 }).notNull().default("pending"), // 'pending' | 'validated' | 'imported' | 'failed'
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // 'pending' | 'validated' | 'imported' | 'failed' | 'needs_review'
   validationErrors: jsonb("validation_errors"), // string[]
   targetEntityId: uuid("target_entity_id"),
+  rowFingerprint: varchar("row_fingerprint", { length: 64 }),
+  duplicateClassification: varchar("duplicate_classification", { length: 50 }), // 'exact_duplicate' | 'conflicting_reference' | 'possible_cross_source_duplicate'
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -113,6 +117,13 @@ export const importRows = pgTable("import_rows", {
 export const properties = pgTable("properties", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  externalKey: varchar("external_key", { length: 255 }),
+  propertyName: varchar("property_name", { length: 255 }),
+  addressLine1: varchar("address_line1", { length: 255 }),
+  addressLine2: varchar("address_line2", { length: 255 }),
+  city: varchar("city", { length: 255 }),
+  state: varchar("state", { length: 255 }),
+  postalCode: varchar("postal_code", { length: 50 }),
   address: varchar("address", { length: 255 }).notNull(),
   nickname: varchar("nickname", { length: 255 }).notNull(),
   propertyType: varchar("property_type", { length: 50 }).notNull(), // 'single_family', 'multi_family', 'condo', etc.
@@ -127,7 +138,9 @@ export const properties = pgTable("properties", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
-});
+}, (table) => ({
+  uniqueOrgExtKey: uniqueIndex("unique_properties_org_ext_key").on(table.orgId, table.externalKey),
+}));
 
 // 4. Buildings (Properties can contain buildings, which contain units)
 export const buildings = pgTable("buildings", {
@@ -148,24 +161,33 @@ export const units = pgTable("units", {
   orgId: uuid("org_id").references(() => organizations.id).notNull(),
   propertyId: uuid("property_id").references(() => properties.id).notNull(),
   buildingId: uuid("building_id").references(() => buildings.id),
+  externalKey: varchar("external_key", { length: 255 }),
   unitNumber: varchar("unit_number", { length: 50 }).notNull(),
+  bedrooms: integer("bedrooms"),
+  bathrooms: varchar("bathrooms", { length: 50 }),
   status: varchar("status", { length: 50 }).notNull().default("vacant"), // 'occupied' | 'vacant' | 'notice_given' | 'offline'
   type: varchar("type", { length: 50 }).notNull().default("residential"),
   monthlyRent: integer("monthly_rent").notNull(), // stored in cents
+  marketRentCents: integer("market_rent_cents").notNull().default(0),
   sizeSqFt: integer("size_sq_ft"),
   importRunId: uuid("import_run_id").references(() => importRuns.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
-});
+}, (table) => ({
+  uniqueOrgExtKey: uniqueIndex("unique_units_org_ext_key").on(table.orgId, table.externalKey),
+}));
 
 // 6. Tenants
 export const tenants = pgTable("tenants", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  externalKey: varchar("external_key", { length: 255 }),
+  firstName: varchar("first_name", { length: 255 }),
+  lastName: varchar("last_name", { length: 255 }),
   name: varchar("name", { length: 255 }).notNull(),
-  email: varchar("email", { length: 255 }).notNull(),
-  phone: varchar("phone", { length: 50 }).notNull(),
+  email: varchar("email", { length: 255 }), // optional
+  phone: varchar("phone", { length: 50 }), // optional
   notes: text("notes"),
   portalStatus: varchar("portal_status", { length: 50 }).notNull().default("inactive"), // 'invited' | 'active' | 'inactive'
   inviteToken: varchar("invite_token", { length: 255 }),
@@ -173,7 +195,9 @@ export const tenants = pgTable("tenants", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
-});
+}, (table) => ({
+  uniqueOrgExtKey: uniqueIndex("unique_tenants_org_ext_key").on(table.orgId, table.externalKey),
+}));
 
 // 7. Leases
 export const leases = pgTable("leases", {
@@ -272,10 +296,13 @@ export const financialRecords = pgTable("financial_records", {
   type: varchar("type", { length: 50 }).notNull(), // 'income' | 'expense'
   amount: integer("amount").notNull(), // stored in cents
   date: timestamp("date").notNull(),
+  paidDate: date("paid_date"),
+  transactionDate: date("transaction_date"),
   category: varchar("category", { length: 100 }).notNull(),
   notes: text("notes"),
   vendorId: uuid("vendor_id").references(() => vendors.id),
   sourceTransactionRef: varchar("source_transaction_ref", { length: 255 }),
+  externalReference: varchar("external_reference", { length: 255 }),
   state: varchar("state", { length: 50 }).notNull().default("approved"), // 'approved' | 'review'
   importRunId: uuid("import_run_id").references(() => importRuns.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -325,12 +352,54 @@ export const payments = pgTable("payments", {
   providerId: varchar("provider_id", { length: 255 }),
   source: varchar("source", { length: 50 }).notNull().default("manual"), // 'manual' | 'imported' | 'provider'
   idempotencyKey: varchar("idempotency_key", { length: 255 }),
+  coverageMonth: varchar("coverage_month", { length: 7 }), // YYYY-MM
+  externalReference: varchar("external_reference", { length: 255 }),
+  allocationMethod: varchar("allocation_method", { length: 50 }), // 'coverage_month' | 'single_charge_match' | 'unallocated' | 'needs_review'
   importRunId: uuid("import_run_id").references(() => importRuns.id),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
 });
+
+// 15. Monthly Financial Summaries (Imported Data Model Only)
+export const monthlyFinancialSummaries = pgTable("monthly_financial_summaries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
+  scheduledRentCents: integer("scheduled_rent_cents").notNull().default(0),
+  collectedRentCents: integer("collected_rent_cents").notNull().default(0),
+  expenseCents: integer("expense_cents").notNull().default(0),
+  sourceNote: text("source_note"),
+  importRunId: uuid("import_run_id").references(() => importRuns.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  archivedAt: timestamp("archived_at"),
+}, (table) => ({
+  uniqueOrgPropMonthSummary: uniqueIndex("unique_org_property_month_summary").on(table.orgId, table.propertyId, table.month),
+}));
+
+// 16. Property Month Financial Coverages (Coverage State & Attestation Model)
+export const propertyMonthFinancialCoverages = pgTable("property_month_financial_coverages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => organizations.id).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
+  state: varchar("state", { length: 50 }).notNull().default("summary_only"), // 'summary_only' | 'partial_detail' | 'detail_complete' | 'needs_review'
+  attestedByUserId: uuid("attested_by_user_id").references(() => users.id),
+  attestedAt: timestamp("attested_at"),
+  attestationReason: text("attestation_reason"),
+  invalidatedAt: timestamp("invalidated_at"),
+  invalidatedByEntityType: varchar("invalidated_by_entity_type", { length: 100 }),
+  invalidatedByEntityId: uuid("invalidated_by_entity_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  archivedAt: timestamp("archived_at"),
+}, (table) => ({
+  uniqueOrgPropMonthCoverage: uniqueIndex("unique_org_property_month_coverage").on(table.orgId, table.propertyId, table.month),
+}));
+
 
 // 15. Payment Allocations
 export const paymentAllocations = pgTable("payment_allocations", {

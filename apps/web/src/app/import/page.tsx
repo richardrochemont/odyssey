@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import Header from "@/components/Header";
-import { Upload, CheckCircle2, AlertTriangle, Play, RefreshCw, BarChart2 } from "lucide-react";
+import { Upload, CheckCircle2, AlertTriangle, Play, RefreshCw, BarChart2, Download } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface ImportRun {
@@ -24,21 +24,21 @@ export default function ImportPage() {
 
   const [csvContent, setCsvContent] = useState("");
   const [fileName, setFileName] = useState("");
-  const [importType, setImportType] = useState<"properties" | "units" | "tenants" | "leases" | "payments" | "expenses">("properties");
+  const [importType, setImportType] = useState<"properties" | "units" | "tenants" | "leases" | "payments" | "expenses" | "monthly_summaries">("properties");
   const [headers, setHeaders] = useState<string[]>([]);
-
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Default expected fields per import type
+  // Expected fields per import type
   const expectedFieldsMap: Record<string, string[]> = {
-    properties: ["address", "nickname", "propertyType", "ownershipPercentage", "acquisitionDate", "estimatedValue", "notes"],
-    units: ["propertyNickname", "unitNumber", "monthlyRent", "sizeSqFt", "status"],
-    tenants: ["name", "email", "phone", "notes"],
-    leases: ["propertyNickname", "unitNumber", "tenantEmail", "startDate", "endDate", "monthlyRent", "securityDeposit", "status"],
-    payments: ["tenantEmail", "amount", "receivedDate", "method", "memo"],
-    expenses: ["propertyNickname", "amount", "date", "category", "notes", "vendorName", "isHistoricalSummary"],
+    properties: ["propertyExternalKey", "propertyName", "addressLine1", "addressLine2", "city", "state", "postalCode", "propertyType", "acquisitionDate", "estimatedValue"],
+    units: ["propertyExternalKey", "unitExternalKey", "unitNumber", "bedrooms", "bathrooms", "status", "marketRent"],
+    tenants: ["firstName", "lastName", "email", "phone", "externalTenantKey"],
+    leases: ["unitExternalKey", "tenantExternalKey", "tenantEmail", "startDate", "endDate", "monthlyRent", "securityDeposit", "leaseStatus"],
+    payments: ["propertyExternalKey", "unitExternalKey", "tenantExternalKey", "tenantEmail", "amount", "paymentDate", "coverageMonth", "paymentMethod", "memo", "externalReference"],
+    expenses: ["propertyExternalKey", "unitExternalKey", "vendorName", "category", "amount", "paidDate", "transactionDate", "memo", "externalReference"],
+    monthly_summaries: ["propertyExternalKey", "month", "scheduledRent", "collectedRent", "expenses", "sourceNote"],
   };
 
   const fetchWithAuth = async (path: string, options: RequestInit = {}) => {
@@ -54,6 +54,26 @@ export default function ImportPage() {
     return res.json();
   };
 
+  const downloadTemplate = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const res = await fetch(`${apiUrl}/imports/templates/${importType}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to download template");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${importType}_template.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
   // Queries
   const { data: defaultSource } = useQuery({
     queryKey: ["import-source-default", token],
@@ -65,7 +85,7 @@ export default function ImportPage() {
     queryKey: ["import-runs", token],
     queryFn: () => fetchWithAuth("/imports/runs"),
     enabled: !!token,
-    refetchInterval: 3000, // Poll progress every 3s
+    refetchInterval: 3000,
   });
 
   // Mutations
@@ -89,16 +109,11 @@ export default function ImportPage() {
     onSuccess: (data) => {
       setHeaders(data.headers);
 
-      // Auto-suggest mapping based on matching strings
       const initialMap: Record<string, string> = {};
       const expected = expectedFieldsMap[importType] || [];
       data.headers.forEach((h: string) => {
         const match = expected.find(f => f.toLowerCase() === h.toLowerCase().trim().replace(/[\s_]+/g, ""));
-        if (match) {
-          initialMap[h] = match;
-        } else {
-          initialMap[h] = "";
-        }
+        initialMap[h] = match || "";
       });
       setColumnMapping(initialMap);
     },
@@ -123,18 +138,15 @@ export default function ImportPage() {
       return res.json();
     },
     onSuccess: () => {
-      setSuccessMsg("CSV Onboarding import successfully scheduled in background!");
+      setSuccessMsg("Owner CSV import run completed successfully!");
       queryClient.invalidateQueries({ queryKey: ["import-runs", token] });
-      // Reset staging
       setCsvContent("");
       setFileName("");
       setHeaders([]);
-
     },
     onError: (err: any) => setError(err.message),
   });
 
-  // Handles raw CSV loading
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setSuccessMsg(null);
@@ -156,7 +168,6 @@ export default function ImportPage() {
     setError(null);
     setSuccessMsg(null);
 
-    // Verify all columns mapped or alert
     triggerImportMutation.mutate({
       sourceId: defaultSource.id,
       fileName,
@@ -168,44 +179,50 @@ export default function ImportPage() {
 
   return (
     <div className="min-h-screen bg-[#0D0E12] text-slate-100 flex">
-      {/* Main Panel */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#0F1015]">
         <Header />
 
         <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
-          
-          {/* Main card upload grid */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-white tracking-tight">Owner CSV Onboarding Portal</h1>
+              <p className="text-sm text-slate-400">Import portfolio assets, historical rent payments, expenses, and monthly summaries safely.</p>
+            </div>
+            <button
+              onClick={downloadTemplate}
+              className="px-4 py-2 bg-[#1C1F2E] border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-semibold text-indigo-400 flex items-center gap-2 transition-all shadow-md"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download {importType} Template</span>
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* CSV Upload Dropzone */}
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-[#151720]/80 border border-slate-800 rounded-2xl p-8 backdrop-blur-md shadow-xl flex flex-col justify-between">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-white mb-2">Upload Historical Ledger</h2>
-                  <p className="text-slate-400 text-sm mb-6">Select the asset layout, map custom headers, and stream real estate records safely.</p>
+                  <h2 className="text-xl font-bold tracking-tight text-white mb-2">Upload Onboarding CSV</h2>
+                  <p className="text-slate-400 text-sm mb-6">Select the entity type, map custom headers, and process real estate records without external invitations or side-effects.</p>
                   
-                  {/* Select Import Type */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                     {Object.keys(expectedFieldsMap).map((type) => (
                       <button
                         key={type}
                         onClick={() => {
                           setImportType(type as any);
                           setHeaders([]);
-
                         }}
-                        className={`px-4 py-3 rounded-xl border text-xs font-semibold capitalize transition-all duration-300 ${
+                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold capitalize transition-all duration-300 ${
                           importType === type
                             ? "bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-indigo-900/30"
                             : "bg-[#181A25] border-slate-800 text-slate-400 hover:border-slate-700"
                         }`}
                       >
-                        {type}
+                        {type.replace("_", " ")}
                       </button>
                     ))}
                   </div>
 
-                  {/* Dropzone area */}
                   <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-800 hover:border-slate-700 bg-[#171923] rounded-2xl p-10 cursor-pointer group transition-all duration-300">
                     <input
                       type="file"
@@ -236,7 +253,6 @@ export default function ImportPage() {
                 )}
               </div>
 
-              {/* CSV Columns mapping & preview */}
               {headers.length > 0 && (
                 <div className="bg-[#151720]/80 border border-slate-800 rounded-2xl p-8 backdrop-blur-md shadow-xl space-y-6">
                   <h3 className="text-lg font-bold text-white">Interactive Column Mapper</h3>
@@ -268,14 +284,13 @@ export default function ImportPage() {
                       className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/30 transition-all duration-300 disabled:opacity-50"
                     >
                       <Play className="w-4 h-4" />
-                      {triggerImportMutation.isPending ? "Starting Import..." : "Initiate Import Run"}
+                      {triggerImportMutation.isPending ? "Processing Import..." : "Execute Onboarding Run"}
                     </button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Run Progress Logs Side Panel */}
             <div className="bg-[#151720]/80 border border-slate-800 rounded-2xl p-6 backdrop-blur-md shadow-xl space-y-6 h-fit">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -299,7 +314,7 @@ export default function ImportPage() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="text-xs font-bold text-white truncate max-w-[150px]">{run.fileName}</p>
-                          <p className="text-[10px] text-slate-500 capitalize">{run.importType} • {new Date(run.createdAt).toLocaleDateString()}</p>
+                          <p className="text-[10px] text-slate-500 capitalize">{run.importType.replace("_", " ")} • {new Date(run.createdAt).toLocaleDateString()}</p>
                         </div>
                         <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider ${
                           run.status === "completed" ? "bg-emerald-950/40 text-emerald-400 border border-emerald-900" :
@@ -311,11 +326,10 @@ export default function ImportPage() {
                         </span>
                       </div>
 
-                      {/* Progress Bar */}
                       <div className="space-y-1">
                         <div className="flex justify-between text-[9px] text-slate-400">
-                          <span>Rows: {run.processedRows} / {run.totalRows}</span>
-                          {run.failedRows > 0 && <span className="text-red-400">Errors: {run.failedRows}</span>}
+                          <span>Processed: {run.processedRows} / {run.totalRows}</span>
+                          {run.failedRows > 0 && <span className="text-red-400">Failures: {run.failedRows}</span>}
                         </div>
                         <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                           <div
@@ -337,9 +351,7 @@ export default function ImportPage() {
                 )}
               </div>
             </div>
-
           </div>
-
         </div>
       </main>
     </div>

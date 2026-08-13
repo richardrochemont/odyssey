@@ -327,7 +327,130 @@ export type ImportSourceCreateInput = z.infer<typeof ImportSourceCreateSchema>;
 export const ImportRunCreateSchema = z.object({
   sourceId: z.string().uuid("Invalid source ID"),
   fileName: z.string().min(1, "File name is required"),
-  importType: z.enum(["properties", "units", "tenants", "leases", "payments", "expenses", "transactions"]),
+  importType: z.enum(["properties", "units", "tenants", "leases", "payments", "expenses", "monthly_summaries", "transactions"]),
   status: z.enum(["pending", "processing", "completed", "failed"]).default("pending"),
 });
 export type ImportRunCreateInput = z.infer<typeof ImportRunCreateSchema>;
+
+// Coverage Status & Regex
+export const DetailCoverageStatusEnum = z.enum([
+  "summary_only",
+  "partial_detail",
+  "detail_complete",
+  "needs_review",
+]);
+export type DetailCoverageStatus = z.infer<typeof DetailCoverageStatusEnum>;
+
+export const CoverageMonthRegex = /^20[0-9]{2}-(0[1-9]|1[0-2])$/;
+
+// Currency Parser Utility
+export function parseCurrencyToCents(val: unknown, allowNegative = false): number {
+  if (val === null || val === undefined) throw new Error("Currency value is missing");
+  const str = String(val).trim();
+  if (!str) throw new Error("Currency string is empty");
+
+  const match = str.match(/^(-)?\$?\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)(?:\.([0-9]{1,2}))?$/);
+  if (!match) throw new Error(`Invalid currency format: "${str}"`);
+
+  const isNeg = !!match[1];
+  if (isNeg && !allowNegative) throw new Error(`Negative currency value not allowed: "${str}"`);
+
+  const wholeStr = match[2].replace(/,/g, "");
+  const centsStr = (match[3] || "").padEnd(2, "0");
+
+  const cents = parseInt(wholeStr, 10) * 100 + parseInt(centsStr, 10);
+  if (!Number.isSafeInteger(cents)) throw new Error("Currency value out of integer range");
+
+  return isNeg ? -cents : cents;
+}
+
+// CSV Onboarding Row Schemas
+export const PropertiesCSVSchema = z.object({
+  propertyExternalKey: z.string().min(1, "propertyExternalKey is required"),
+  propertyName: z.string().min(1, "propertyName is required"),
+  addressLine1: z.string().min(1, "addressLine1 is required"),
+  addressLine2: z.string().optional().nullable(),
+  city: z.string().min(1, "city is required"),
+  state: z.string().min(1, "state is required"),
+  postalCode: z.string().min(1, "postalCode is required"),
+  propertyType: PropertyTypeEnum.default("single_family"),
+  acquisitionDate: z.string().optional().nullable().refine(val => !val || !isNaN(Date.parse(val)), "Invalid acquisitionDate"),
+  estimatedValue: z.string().optional().nullable().transform(v => v ? parseCurrencyToCents(v) : 0),
+});
+export type PropertiesCSVInput = z.infer<typeof PropertiesCSVSchema>;
+
+export const UnitsCSVSchema = z.object({
+  propertyExternalKey: z.string().min(1, "propertyExternalKey is required"),
+  unitExternalKey: z.string().min(1, "unitExternalKey is required"),
+  unitNumber: z.string().min(1, "unitNumber is required"),
+  bedrooms: z.string().optional().nullable().transform(v => v ? parseInt(v, 10) : null),
+  bathrooms: z.string().optional().nullable(),
+  status: UnitStatusEnum.default("vacant"),
+  marketRent: z.string().optional().nullable().transform(v => v ? parseCurrencyToCents(v) : 0),
+});
+export type UnitsCSVInput = z.infer<typeof UnitsCSVSchema>;
+
+export const TenantsCSVSchema = z.object({
+  firstName: z.string().min(1, "firstName is required"),
+  lastName: z.string().min(1, "lastName is required"),
+  email: z.string().optional().nullable().refine(val => !val || z.string().email().safeParse(val.trim().toLowerCase()).success, "Invalid email"),
+  phone: z.string().optional().nullable(),
+  externalTenantKey: z.string().optional().nullable(),
+});
+export type TenantsCSVInput = z.infer<typeof TenantsCSVSchema>;
+
+export const LeasesCSVSchema = z.object({
+  unitExternalKey: z.string().min(1, "unitExternalKey is required"),
+  tenantExternalKey: z.string().optional().nullable(),
+  tenantEmail: z.string().optional().nullable(),
+  startDate: z.string().refine(val => !isNaN(Date.parse(val)), "Invalid startDate"),
+  endDate: z.string().refine(val => !isNaN(Date.parse(val)), "Invalid endDate"),
+  monthlyRent: z.string().transform(v => parseCurrencyToCents(v)),
+  securityDeposit: z.string().optional().nullable().transform(v => v ? parseCurrencyToCents(v) : 0),
+  leaseStatus: LeaseStatusEnum.default("active"),
+}).refine(data => !!data.tenantExternalKey || !!data.tenantEmail, {
+  message: "Either tenantExternalKey or tenantEmail is required",
+  path: ["tenantExternalKey"],
+});
+export type LeasesCSVInput = z.infer<typeof LeasesCSVSchema>;
+
+export const HistoricalPaymentsCSVSchema = z.object({
+  propertyExternalKey: z.string().min(1, "propertyExternalKey is required"),
+  unitExternalKey: z.string().min(1, "unitExternalKey is required"),
+  tenantExternalKey: z.string().optional().nullable(),
+  tenantEmail: z.string().optional().nullable(),
+  amount: z.string().transform(v => parseCurrencyToCents(v)),
+  paymentDate: z.string().refine(val => !isNaN(Date.parse(val)), "Invalid paymentDate"),
+  coverageMonth: z.string().optional().nullable().refine(val => !val || CoverageMonthRegex.test(val), "Invalid coverageMonth (expected YYYY-MM)"),
+  paymentMethod: z.string().optional().nullable(),
+  memo: z.string().optional().nullable(),
+  externalReference: z.string().optional().nullable(),
+}).refine(data => !!data.tenantExternalKey || !!data.tenantEmail, {
+  message: "Either tenantExternalKey or tenantEmail is required",
+  path: ["tenantExternalKey"],
+});
+export type HistoricalPaymentsCSVInput = z.infer<typeof HistoricalPaymentsCSVSchema>;
+
+export const HistoricalExpensesCSVSchema = z.object({
+  propertyExternalKey: z.string().min(1, "propertyExternalKey is required"),
+  unitExternalKey: z.string().optional().nullable(),
+  vendorName: z.string().optional().nullable(),
+  category: FinancialCategoryEnum.default("other"),
+  amount: z.string().transform(v => parseCurrencyToCents(v)),
+  paidDate: z.string().refine(val => !isNaN(Date.parse(val)), "Invalid paidDate"),
+  transactionDate: z.string().optional().nullable().refine(val => !val || !isNaN(Date.parse(val)), "Invalid transactionDate"),
+  memo: z.string().optional().nullable(),
+  externalReference: z.string().optional().nullable(),
+});
+export type HistoricalExpensesCSVInput = z.infer<typeof HistoricalExpensesCSVSchema>;
+
+export const MonthlySummaryCSVSchema = z.object({
+  propertyExternalKey: z.string().min(1, "propertyExternalKey is required"),
+  month: z.string().regex(CoverageMonthRegex, "Invalid month format (expected YYYY-MM)"),
+  scheduledRent: z.string().transform(v => parseCurrencyToCents(v)),
+  collectedRent: z.string().transform(v => parseCurrencyToCents(v)),
+  expenses: z.string().transform(v => parseCurrencyToCents(v)),
+  sourceNote: z.string().optional().nullable(),
+});
+export type MonthlySummaryCSVInput = z.infer<typeof MonthlySummaryCSVSchema>;
+

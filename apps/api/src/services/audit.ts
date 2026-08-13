@@ -5,7 +5,7 @@ export interface CreateAuditLogParams {
   userId: string;
   entityType: string;
   entityId: string;
-  action: "create" | "update" | "archive" | "status_transition" | "invite_portal" | "activate_portal" | "webhook_callback";
+  action: "create" | "update" | "archive" | "status_transition" | "invite_portal" | "activate_portal" | "webhook_callback" | "coverage_invalidated" | "attest_coverage_complete" | "rollback_coverage_needs_review";
   previousState?: Record<string, any> | null;
   newState?: Record<string, any> | null;
 }

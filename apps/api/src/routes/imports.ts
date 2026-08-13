@@ -1,9 +1,24 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { authenticate, authorize } from "../middleware/auth";
 import * as service from "../services/imports";
+import { CSV_TEMPLATES, generateCSVContent } from "../services/templates";
 
 export default async function importRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
   fastify.addHook("preHandler", authenticate);
+
+  // Get CSV Template
+  fastify.get("/templates/:type", {
+    preHandler: authorize(["owner", "manager"])
+  }, async (request, reply) => {
+    const { type } = request.params as { type: string };
+    const template = CSV_TEMPLATES[type];
+    if (!template) return reply.code(404).send({ error: `Template for type "${type}" not found` });
+
+    const csvStr = generateCSVContent(template);
+    reply.header("Content-Type", "text/csv");
+    reply.header("Content-Disposition", `attachment; filename="${template.filename}"`);
+    return reply.send(csvStr);
+  });
 
   // Get or create default CSV source
   fastify.get("/sources/default", {
@@ -44,7 +59,7 @@ export default async function importRoutes(fastify: FastifyInstance, _options: F
     }
 
     try {
-      const run = await service.createImportRun(
+      const runDetails = await service.createImportRun(
         user.orgId,
         user.id,
         sourceId,
@@ -53,7 +68,7 @@ export default async function importRoutes(fastify: FastifyInstance, _options: F
         csv,
         columnMapping
       );
-      return reply.code(201).send(run);
+      return reply.code(201).send(runDetails);
     } catch (e: any) {
       return reply.code(400).send({ error: e.message });
     }
@@ -76,13 +91,5 @@ export default async function importRoutes(fastify: FastifyInstance, _options: F
     const details = await service.getImportRunDetails(user.orgId, id);
     if (!details) return reply.code(404).send({ error: "Import run not found" });
     return details;
-  });
-
-  // Reconciliation statistics
-  fastify.get("/reconciliation", {
-    preHandler: authorize(["owner", "manager", "read_only"])
-  }, async (request, _reply) => {
-    const user = request.user!;
-    return service.getReconciliationStatus(user.orgId);
   });
 }

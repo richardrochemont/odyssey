@@ -111,8 +111,27 @@ async function run() {
     console.log("Running cash flow double-counting check...");
     const { getPortfolioFinancialSummary } = await import("./financials");
     const summaryCheck = await getPortfolioFinancialSummary(org.id);
-    assert.ok(summaryCheck.totalExpenses >= 0);
+    assert.ok(summaryCheck.totalExpenses !== null && summaryCheck.totalExpenses >= 0);
     console.log("Cash flow double-counting check passed!");
+
+    // 7. Onboarding Safeguards Tests
+    console.log("Running onboarding safeguards & currency parser tests...");
+    const { parseCurrencyToCents } = await import("@odyssey/validation");
+    const { createCanonicalFingerprint } = await import("./imports");
+    const { getOrCalculatePropertyMonthCoverage } = await import("./monthlySummaries");
+
+    assert.strictEqual(parseCurrencyToCents("$1,850.50"), 185050);
+    assert.strictEqual(parseCurrencyToCents("1850"), 185000);
+    assert.throws(() => parseCurrencyToCents("1850.555"));
+    assert.throws(() => parseCurrencyToCents("-100"));
+
+    const fp1 = createCanonicalFingerprint({ amount: "$1,850.50", email: "JOHN@EXAMPLE.COM " });
+    const fp2 = createCanonicalFingerprint({ email: "john@example.com", amount: "1850.50" });
+    assert.strictEqual(fp1, fp2);
+
+    const covCheck = await getOrCalculatePropertyMonthCoverage(org.id, "dummy-prop", "2026-05");
+    assert.strictEqual(covCheck.state, "no_data");
+    console.log("Onboarding safeguards & currency parser tests passed!");
 
     console.log("All Odyssey business unit tests passed successfully!");
     process.exit(0);

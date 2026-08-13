@@ -58,12 +58,16 @@ export default async function authRoutes(fastify: FastifyInstance, _options: Fas
     return list;
   });
 
+  const isE2ETest =
+    process.env.NODE_ENV === "test" &&
+    process.env.E2E_TEST_MODE === "true";
+
   // Standard email/password login with persistent active workspace selection
   fastify.post("/login", {
     config: {
       rateLimit: {
-        max: 5,
-        timeWindow: 15 * 60 * 1000, // 5 attempts per 15 mins
+        max: isE2ETest ? 1000 : 5,
+        timeWindow: 15 * 60 * 1000, // 5 attempts per 15 mins default
       },
     },
   }, async (request, reply) => {

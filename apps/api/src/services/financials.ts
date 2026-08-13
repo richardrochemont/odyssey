@@ -1,7 +1,8 @@
-import { db, financialRecords, leases, properties, units, charges, paymentAllocations } from "@odyssey/db";
+import { db, financialRecords, properties, units, charges, paymentAllocations } from "@odyssey/db";
 import { and, eq, isNull, gte, lte } from "drizzle-orm";
 import { logAction } from "./audit";
 import { FinancialRecordCreateInput } from "@odyssey/validation";
+import { getOrCalculatePropertyMonthCoverage } from "./monthlySummaries";
 
 export async function listFinancialRecords(orgId: string) {
   return db.select({
@@ -9,7 +10,7 @@ export async function listFinancialRecords(orgId: string) {
     propertyId: financialRecords.propertyId,
     unitId: financialRecords.unitId,
     type: financialRecords.type,
-    amount: financialRecords.amount, // in cents
+    amount: financialRecords.amount,
     date: financialRecords.date,
     category: financialRecords.category,
     notes: financialRecords.notes,
@@ -33,7 +34,7 @@ export async function createFinancialRecord(orgId: string, userId: string, input
     propertyId: input.propertyId,
     unitId: input.unitId || null,
     type: "expense",
-    amount: Math.round(input.amount * 100), // convert dollars to cents
+    amount: Math.round(input.amount * 100),
     date: new Date(input.date),
     category: input.category,
     notes: input.notes || null,
@@ -80,24 +81,63 @@ export async function archiveFinancialRecord(orgId: string, userId: string, id: 
 }
 
 export interface PortfolioSummary {
-  scheduledRent: number; // in cents
-  recordedRent: number;  // in cents
-  outstandingRent: number; // in cents
-  totalIncome: number;   // in cents
-  totalExpenses: number; // in cents
-  netOperatingIncome: number; // in cents
+  status: "no_data" | "summary_only" | "partial_detail" | "detail_complete" | "needs_review";
+  scheduledRent: number | null; // in cents
+  recordedRent: number | null;  // in cents
+  outstandingRent: number | null; // in cents
+  totalIncome: number | null;   // in cents
+  totalExpenses: number | null; // in cents
+  netOperatingIncome: number | null; // in cents
   notes: string;
 }
 
 export async function getPortfolioFinancialSummary(
   orgId: string,
+  propertyId?: string,
   startDate?: Date,
   endDate?: Date
 ): Promise<PortfolioSummary> {
-  const start = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
-  const end = endDate || new Date();
+  const now = new Date();
+  const start = startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-  // 1. Scheduled Rent (obligation billed amount from charges)
+  const monthStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+
+  // If propertyId provided, evaluate exact month coverage
+  if (propertyId) {
+    const coverage = await getOrCalculatePropertyMonthCoverage(orgId, propertyId, monthStr);
+    
+    if (coverage.state === "no_data") {
+      return {
+        status: "no_data",
+        scheduledRent: null,
+        recordedRent: null,
+        outstandingRent: null,
+        totalIncome: null,
+        totalExpenses: null,
+        netOperatingIncome: null,
+        notes: "No financial data available for this month.",
+      };
+    }
+
+    if (coverage.state === "summary_only" || coverage.state === "partial_detail") {
+      const s = coverage.summaryMetrics!;
+      return {
+        status: coverage.state,
+        scheduledRent: s.scheduledRentCents,
+        recordedRent: s.collectedRentCents,
+        outstandingRent: Math.max(0, s.scheduledRentCents - s.collectedRentCents),
+        totalIncome: s.collectedRentCents,
+        totalExpenses: s.expenseCents,
+        netOperatingIncome: s.collectedRentCents - s.expenseCents,
+        notes: coverage.state === "partial_detail" 
+          ? "Partial transaction details present. Summary baseline retained." 
+          : "Historical summary active.",
+      };
+    }
+  }
+
+  // Aggregate across property/charges
   const chargeRecords = await db.select()
     .from(charges)
     .where(and(
@@ -108,7 +148,6 @@ export async function getPortfolioFinancialSummary(
     ));
   const scheduledRent = chargeRecords.reduce((sum, c) => sum + c.amount, 0);
 
-  // 2. Collected Rent (payment allocations matched to charges in timeframe)
   const allocations = await db.select({ amount: paymentAllocations.amount })
     .from(paymentAllocations)
     .innerJoin(charges, eq(paymentAllocations.chargeId, charges.id))
@@ -120,10 +159,8 @@ export async function getPortfolioFinancialSummary(
     ));
   const collectedRent = allocations.reduce((sum, a) => sum + a.amount, 0);
 
-  // 3. Outstanding Rent Balance
   const outstandingRent = chargeRecords.reduce((sum, c) => sum + c.balance, 0);
 
-  // 4. Expenses (Avoiding double counting historical summaries if transactions exist)
   const allExpenses = await db.select()
     .from(financialRecords)
     .where(and(
@@ -134,29 +171,31 @@ export async function getPortfolioFinancialSummary(
       isNull(financialRecords.archivedAt)
     ));
 
-  // Partition expenses into transaction-level vs summary-level
-  const transactionExpenses = allExpenses.filter(e => !e.notes?.startsWith("[Historical Summary]"));
-  const summaryExpenses = allExpenses.filter(e => e.notes?.startsWith("[Historical Summary]"));
+  const totalExpenses = allExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  // Check if we have any transaction-level records
-  let totalExpenses = 0;
-  if (transactionExpenses.length > 0) {
-    totalExpenses = transactionExpenses.reduce((sum, e) => sum + e.amount, 0);
-  } else {
-    totalExpenses = summaryExpenses.reduce((sum, e) => sum + e.amount, 0);
+  // If no charges and no expenses exist at all, return no_data
+  if (chargeRecords.length === 0 && allExpenses.length === 0) {
+    return {
+      status: "no_data",
+      scheduledRent: null,
+      recordedRent: null,
+      outstandingRent: null,
+      totalIncome: null,
+      totalExpenses: null,
+      netOperatingIncome: null,
+      notes: "No financial data available for this month.",
+    };
   }
 
-  const totalIncome = collectedRent;
-  const netOperatingIncome = totalIncome - totalExpenses;
-
   return {
+    status: "detail_complete",
     scheduledRent,
     recordedRent: collectedRent,
     outstandingRent,
-    totalIncome,
+    totalIncome: collectedRent,
     totalExpenses,
-    netOperatingIncome,
-    notes: "Operational view — not accounting",
+    netOperatingIncome: collectedRent - totalExpenses,
+    notes: "Detailed ledger records",
   };
 }
 
@@ -164,84 +203,19 @@ export async function getPortfolioCashFlowTrends(orgId: string) {
   const trends: any[] = [];
   const now = new Date();
 
-  // Fetch active leases to project future rents
-  const activeLeases = await db.select({
-    monthlyRent: leases.monthlyRent,
-    startDate: leases.startDate,
-    endDate: leases.endDate,
-  })
-  .from(leases)
-  .where(and(eq(leases.orgId, orgId), eq(leases.status, "active"), isNull(leases.archivedAt)));
-
-  // Fetch all payment allocations
-  const allAllocations = await db.select({
-    amount: paymentAllocations.amount,
-    dueDate: charges.dueDate,
-  })
-  .from(paymentAllocations)
-  .innerJoin(charges, eq(paymentAllocations.chargeId, charges.id))
-  .where(and(eq(charges.orgId, orgId), isNull(charges.archivedAt)));
-
-  // Fetch all expenses
-  const allExpenses = await db.select()
-    .from(financialRecords)
-    .where(and(eq(financialRecords.orgId, orgId), eq(financialRecords.type, "expense"), isNull(financialRecords.archivedAt)));
-
-  for (let m = 0; m < 9; m++) {
-    const monthOffset = m - 6; // -6 to 2
+  for (let m = 0; m < 6; m++) {
+    const monthOffset = m - 5;
     const targetDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
     const monthLabel = targetDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-    
-    const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-    const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
 
-    // Collected Rent (actual received allocation due in this month)
-    const collected = allAllocations
-      .filter((a) => {
-        const d = new Date(a.dueDate);
-        return d >= startOfMonth && d <= endOfMonth;
-      })
-      .reduce((sum, a) => sum + a.amount, 0);
-
-    // Projected Rent (scheduled rent based on active leases for this month)
-    const projected = activeLeases
-      .filter((l) => {
-        const start = new Date(l.startDate);
-        const end = new Date(l.endDate);
-        return startOfMonth <= end && endOfMonth >= start;
-      })
-      .reduce((sum, l) => sum + l.monthlyRent, 0);
-
-    // Filter expenses in month
-    const monthExpenses = allExpenses.filter((e) => {
-      const d = new Date(e.date);
-      return d >= startOfMonth && d <= endOfMonth;
-    });
-
-    const txExpenses = monthExpenses.filter(e => !e.notes?.startsWith("[Historical Summary]"));
-    const sumExpenses = monthExpenses.filter(e => e.notes?.startsWith("[Historical Summary]"));
-
-    let finalExpenses = 0;
-    if (txExpenses.length > 0) {
-      finalExpenses = txExpenses.reduce((sum, e) => sum + e.amount, 0);
-    } else {
-      finalExpenses = sumExpenses.reduce((sum, e) => sum + e.amount, 0);
-    }
-
-    // Projected Expenses for future months
-    if (monthOffset > 0 && finalExpenses === 0) {
-      const pastExpenses = allExpenses.filter((e) => new Date(e.date) < now && !e.notes?.startsWith("[Historical Summary]"));
-      const avgPast = pastExpenses.length > 0 
-        ? Math.round(pastExpenses.reduce((sum, e) => sum + e.amount, 0) / 6) 
-        : 0;
-      finalExpenses = avgPast || 510000; // default average
-    }
+    const summary = await getPortfolioFinancialSummary(orgId, undefined, targetDate, new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59));
 
     trends.push({
       month: monthLabel,
-      collected: collected / 100,
-      projected: projected / 100,
-      expenses: finalExpenses / 100,
+      status: summary.status,
+      collected: summary.recordedRent !== null ? summary.recordedRent / 100 : null,
+      expenses: summary.totalExpenses !== null ? summary.totalExpenses / 100 : null,
+      netIncome: summary.netOperatingIncome !== null ? summary.netOperatingIncome / 100 : null,
     });
   }
 
