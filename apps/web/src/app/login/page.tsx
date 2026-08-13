@@ -30,8 +30,7 @@ export default function LoginPage() {
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerOrgName, setRegisterOrgName] = useState("");
-  const [invitationToken, setInvitationToken] = useState<string | null>(null);
-
+  const [invitationToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingSeedId, setSubmittingSeedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
