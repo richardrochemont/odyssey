@@ -165,11 +165,12 @@ async function startServer() {
     try {
       await db.execute(sql`select 1`);
       return { status: "healthy", database: "connected", timestamp: new Date().toISOString() };
-    } catch (error: unknown) {
+    } catch (error: any) {
       app.log.error({ err: error }, "Database health check failed");
       return reply.code(503).send({
         status: "unhealthy",
         database: "disconnected",
+        error: error.message || String(error),
         timestamp: new Date().toISOString()
       });
     }
