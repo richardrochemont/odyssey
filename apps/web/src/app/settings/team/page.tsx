@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Header from "@/components/Header";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -384,7 +385,7 @@ export default function TeamSettingsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-muted">
-                        {new Date(m.joinedAt).toLocaleDateString()}
+                        {formatDate(m.joinedAt)}
                       </td>
                       {isOwner && (
                         <td className="px-6 py-4 text-right">
@@ -449,7 +450,7 @@ export default function TeamSettingsPage() {
                         <td className="px-6 py-4 font-semibold text-foreground">{inv.email}</td>
                         <td className="px-6 py-4 capitalize text-muted">{inv.role.replace("_", " ")}</td>
                         <td className="px-6 py-4 text-muted">{inv.invitedByName}</td>
-                        <td className="px-6 py-4 text-muted">{new Date(inv.expiresAt).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-muted">{formatDate(inv.expiresAt)}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button

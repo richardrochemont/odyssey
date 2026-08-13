@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/format";
 import {
   BrainCircuit,
   X,
@@ -165,7 +166,7 @@ export default function AssistantPanel() {
           ...prev,
           {
             sender: "ai",
-            text: `✅ **Expense Saved Successfully!** Added $${draft.amount.toLocaleString()} for ${draft.category.replace(/_/g, " ")} to the ledger.`,
+            text: `✅ **Expense Saved Successfully!** Added ${formatCurrency(draft.amount)} for ${draft.category.replace(/_/g, " ")} to the ledger.`,
           },
         ]);
       } else {
@@ -253,7 +254,7 @@ export default function AssistantPanel() {
                             )}
                             <div>
                               <p className="text-muted font-bold uppercase text-[9px] tracking-wider">Amount</p>
-                              <p className="font-semibold text-primary font-serif">${msg.card.data.amount.toLocaleString()}</p>
+                              <p className="font-semibold text-primary font-serif">{formatCurrency(msg.card.data.amount)}</p>
                             </div>
                             <div>
                               <p className="text-muted font-bold uppercase text-[9px] tracking-wider">Category</p>
@@ -288,7 +289,7 @@ export default function AssistantPanel() {
                               <p className="font-bold text-foreground">{rec.tenantName} (Unit {rec.unitNumber})</p>
                               <p className="text-muted">{rec.propertyNickname} • Expires in {rec.expiryDate}</p>
                               <div className="flex items-center justify-between font-serif pt-1">
-                                <span>Current: ${rec.currentRent.toLocaleString()}</span>
+                                <span>Current: {formatCurrency(rec.currentRent)}</span>
                                 <span className="font-bold text-primary">Range: ${rec.projectedRentMin} - ${rec.projectedRentMax}</span>
                               </div>
                               <p className="text-[9px] text-muted italic mt-1 font-sans">{rec.assumptions}</p>
@@ -307,7 +308,7 @@ export default function AssistantPanel() {
                                 <p className="text-muted text-[10px]">{p.property} Unit {p.unit}</p>
                               </div>
                               <div className="text-right">
-                                <p className="font-bold text-danger font-serif">+${p.balance.toLocaleString()}</p>
+                                <p className="font-bold text-danger font-serif">+{formatCurrency(p.balance)}</p>
                                 <p className="text-[9px] text-muted">Due {p.dueDate}</p>
                               </div>
                             </div>
@@ -322,7 +323,7 @@ export default function AssistantPanel() {
                             <div key={fIdx} className="flex items-center justify-between text-[11px] p-1.5 border-b border-border last:border-b-0">
                               <span className="text-muted">{f.factor}</span>
                               <span className={`font-semibold font-serif ${f.impact < 0 ? "text-danger" : "text-foreground"}`}>
-                                {f.impact < 0 ? "-" : "+"}${Math.abs(f.impact).toLocaleString()}
+                                {f.impact == null ? "—" : `${f.impact < 0 ? "-" : "+"}${formatCurrency(Math.abs(f.impact))}`}
                               </span>
                             </div>
                           ))}

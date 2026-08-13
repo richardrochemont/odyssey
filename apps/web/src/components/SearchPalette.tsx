@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { formatCents, formatDate } from "@/lib/format";
 import {
   Search,
   Building2,
@@ -141,7 +142,7 @@ export default function SearchPalette({ isOpen, onClose }: SearchPaletteProps) {
             list.push({
               id: u.id,
               title: `Unit ${u.unitNumber}`,
-              subtitle: `${p.nickname} • Monthly rent $${((u.monthlyRent || 0) / 100).toLocaleString()}`,
+              subtitle: `${p.nickname} • Monthly rent ${formatCents(u.monthlyRent)}`,
               type: "Unit",
               url: `/properties/${p.id}`,
             });
@@ -178,7 +179,7 @@ export default function SearchPalette({ isOpen, onClose }: SearchPaletteProps) {
         list.push({
           id: l.id,
           title: `${l.tenantName} - Unit ${l.unitNumber}`,
-          subtitle: `${l.propertyNickname} • ${l.status.toUpperCase()} • $${((l.monthlyRent || 0) / 100).toLocaleString()}/mo`,
+          subtitle: `${l.propertyNickname} • ${l.status.toUpperCase()} • ${formatCents(l.monthlyRent)}/mo`,
           type: "Lease",
           url: `/leases/${l.id}`,
         });
@@ -214,7 +215,7 @@ export default function SearchPalette({ isOpen, onClose }: SearchPaletteProps) {
         list.push({
           id: p.id,
           title: `Payment: ${p.tenantName}`,
-          subtitle: `${p.propertyNickname} Unit ${p.unitNumber} • ${p.status.toUpperCase()} • $${((p.amountDue || 0) / 100).toLocaleString()}`,
+          subtitle: `${p.propertyNickname} Unit ${p.unitNumber} • ${p.status.toUpperCase()} • ${formatCents(p.amountDue)}`,
           type: "Payment",
           url: `/cashflow`,
         });
@@ -233,7 +234,7 @@ export default function SearchPalette({ isOpen, onClose }: SearchPaletteProps) {
         list.push({
           id: e.id,
           title: `Expense: ${e.category.replace(/_/g, " ")}`,
-          subtitle: `${e.propertyNickname} • $${((e.amount || 0) / 100).toLocaleString()} • ${e.date.split("T")[0]}`,
+          subtitle: `${e.propertyNickname} • ${formatCents(e.amount)} • ${formatDate(e.date)}`,
           type: "Expense",
           url: `/expenses`,
         });

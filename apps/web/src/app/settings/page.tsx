@@ -2,6 +2,7 @@
 
 import React from "react";
 import Header from "@/components/Header";
+import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import { Users, Building2, ShieldCheck } from "lucide-react";
@@ -62,7 +63,7 @@ export default function SettingsPage() {
                 <div>
                   <span className="text-muted block text-[10px] uppercase font-bold tracking-wider">Joined Date</span>
                   <span className="font-semibold text-foreground mt-0.5 block">
-                    {activeWorkspace?.joinedAt ? new Date(activeWorkspace.joinedAt).toLocaleDateString() : "Active Member"}
+                    {activeWorkspace?.joinedAt ? formatDate(activeWorkspace.joinedAt) : "Active Member"}
                   </span>
                 </div>
               </div>

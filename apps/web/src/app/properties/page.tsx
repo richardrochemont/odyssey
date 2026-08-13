@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import Header from "@/components/Header";
+import { formatDate } from "@/lib/format";
 import { Building2, Plus, Calendar, MapPin, Percent, Loader2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -168,9 +169,9 @@ export default function PropertiesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {properties.map((p) => {
-              const totalUnits = p.units?.length || 0;
-              const occupiedUnits = p.units?.filter((u) => u.status === "occupied" || u.status === "notice_given").length || 0;
-              const vacantUnits = p.units?.filter((u) => u.status === "vacant").length || 0;
+              const totalUnits = p.units?.length ?? 0;
+              const occupiedUnits = p.units?.filter((u) => u.status === "occupied" || u.status === "notice_given").length ?? 0;
+              const vacantUnits = p.units?.filter((u) => u.status === "vacant").length ?? 0;
 
               return (
                 <div key={p.id} className="bg-white border border-border rounded-xl overflow-hidden shadow-sm flex flex-col justify-between">
@@ -196,7 +197,7 @@ export default function PropertiesPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-primary shrink-0" />
-                        <span>Acquired: {new Date(p.acquisitionDate).toLocaleDateString()}</span>
+                        <span>Acquired: {formatDate(p.acquisitionDate)}</span>
                       </div>
                     </div>
 

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Unit {
   id: string;
@@ -360,7 +361,7 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Calendar className="h-4.5 w-4.5 text-primary shrink-0" />
-                  <span>Acquisition Date: {new Date(details.acquisitionDate).toLocaleDateString()}</span>
+                  <span>Acquisition Date: {formatDate(details.acquisitionDate)}</span>
                 </div>
               </div>
 
@@ -405,14 +406,14 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
                   <span>Estimated Value</span>
                   <span className="font-semibold text-foreground">
                     {details.estimatedValue 
-                      ? details.estimatedValue.toLocaleString("en-US", { style: "currency", currency: "USD" })
+                      ? formatCurrency(details.estimatedValue)
                       : "—"}
                   </span>
                 </div>
                 {details.valuationDate && (
                   <div className="flex justify-between">
                     <span>Valuation Date</span>
-                    <span className="text-foreground">{new Date(details.valuationDate).toLocaleDateString()}</span>
+                    <span className="text-foreground">{formatDate(details.valuationDate)}</span>
                   </div>
                 )}
                 {details.valuationSource && (
@@ -563,7 +564,7 @@ export default function PropertyDetailsPage({ params }: { params: { id: string }
                                   className="w-20 border border-border p-1 rounded bg-white text-xs"
                                 />
                               ) : (
-                                unit.monthlyRent.toLocaleString("en-US", { style: "currency", currency: "USD" })
+                                formatCurrency(unit.monthlyRent)
                               )}
                             </td>
                             <td className="py-3 px-3 text-right">

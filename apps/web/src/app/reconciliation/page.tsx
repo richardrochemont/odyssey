@@ -5,6 +5,7 @@ import { useAuth } from "@/context/auth-context";
 import Header from "@/components/Header";
 import { ShieldCheck, AlertTriangle, Calendar, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/format";
 
 interface SummaryData {
   status: "no_data" | "summary_only" | "partial_detail" | "detail_complete" | "needs_review";
@@ -216,7 +217,7 @@ export default function ReconciliationPage() {
                   <div className="text-slate-400 text-xs font-semibold">Scheduled Rent</div>
                   <div>
                     <div className="text-3xl font-extrabold text-white">
-                      ${summary?.scheduledRent?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "—"}
+                      {formatCurrency(summary?.scheduledRent)}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1">Gross scheduled obligation</div>
                   </div>
@@ -226,7 +227,7 @@ export default function ReconciliationPage() {
                   <div className="text-slate-400 text-xs font-semibold">Collected Rent</div>
                   <div>
                     <div className="text-3xl font-extrabold text-indigo-400">
-                      ${summary?.recordedRent?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "—"}
+                      {formatCurrency(summary?.recordedRent)}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1">Actual received cash</div>
                   </div>
@@ -236,7 +237,7 @@ export default function ReconciliationPage() {
                   <div className="text-slate-400 text-xs font-semibold">Operating Expenses</div>
                   <div>
                     <div className="text-3xl font-extrabold text-amber-400">
-                      ${summary?.totalExpenses?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "—"}
+                      {formatCurrency(summary?.totalExpenses)}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1">Approved operating expenses</div>
                   </div>
@@ -249,7 +250,7 @@ export default function ReconciliationPage() {
                 <div>
                   <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Net Operating Income</span>
                   <div className="text-2xl font-bold text-white mt-1">
-                    ${summary?.netOperatingIncome?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? "—"}
+                    {formatCurrency(summary?.netOperatingIncome)}
                   </div>
                 </div>
                 <div className="text-xs text-slate-500 italic max-w-xs text-right">

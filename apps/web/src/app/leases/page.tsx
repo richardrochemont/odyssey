@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Lease {
   id: string;
@@ -311,11 +312,11 @@ export default function LeasesPage() {
                           {lease.propertyNickname} • Unit {lease.unitNumber}
                         </td>
                         <td className="py-4 px-4 leading-relaxed text-muted">
-                          {new Date(lease.startDate).toLocaleDateString()} to {new Date(lease.endDate).toLocaleDateString()}
+                          {formatDate(lease.startDate)} to {formatDate(lease.endDate)}
                         </td>
                         <td className="py-4 px-4">
-                          <p className="font-medium text-foreground">{lease.monthlyRent.toLocaleString("en-US", { style: "currency", currency: "USD" })} / mo</p>
-                          <p className="text-[10px] text-muted mt-0.5">Deposit: {lease.securityDeposit.toLocaleString("en-US", { style: "currency", currency: "USD" })}</p>
+                          <p className="font-medium text-foreground">{formatCurrency(lease.monthlyRent)} / mo</p>
+                          <p className="text-[10px] text-muted mt-0.5">Deposit: {formatCurrency(lease.securityDeposit)}</p>
                         </td>
                         <td className="py-4 px-4">
                           <span className={`px-2 py-0.5 rounded-[4px] font-bold text-[9px] uppercase tracking-wider ${leaseStatusColors[lease.status]}`}>

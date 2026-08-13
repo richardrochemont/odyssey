@@ -13,6 +13,7 @@ import {
   Plus
 } from "lucide-react";
 import Link from "next/link";
+import { formatCurrency, sumNullable } from "@/lib/format";
 
 interface Unit {
   id: string;
@@ -25,7 +26,7 @@ interface Property {
   nickname: string;
   propertyType: string;
   units: Unit[];
-  estimatedValue?: number;
+  estimatedValue?: number | null;
   valuationDate?: string;
   valuationSource?: string;
   valuationNotes?: string;
@@ -40,7 +41,7 @@ interface Lease {
   status: string;
   daysUntilExpiry: number;
   isExpiringSoon: boolean;
-  monthlyRent: number;
+  monthlyRent: number | null;
 }
 
 interface Payment {
@@ -49,8 +50,8 @@ interface Payment {
   leaseId: string;
   propertyId: string;
   unitId: string;
-  amountDue: number;
-  amountReceived: number;
+  amountDue: number | null;
+  amountReceived: number | null;
   dueDate: string;
   paidDate: string | null;
   status: "upcoming" | "paid" | "partial" | "overdue" | "waived";
@@ -66,7 +67,7 @@ interface Expense {
   propertyId: string;
   unitId: string | null;
   type: string;
-  amount: number;
+  amount: number | null;
   date: string;
   category: string;
   notes: string | null;
@@ -76,9 +77,9 @@ interface Expense {
 
 interface Trend {
   month: string;
-  collected: number;
-  projected: number;
-  expenses: number;
+  collected: number | null;
+  projected: number | null;
+  expenses: number | null;
 }
 
 export default function PortfolioOverviewPage() {
@@ -195,32 +196,34 @@ export default function PortfolioOverviewPage() {
   // --- Calculations ---
 
   // 1. Portfolio Value (Sum of property estimated values)
-  const portfolioValue = properties.reduce((sum, p) => sum + (p.estimatedValue || 0), 0);
+  const portfolioValue = sumNullable(properties.map((p) => p.estimatedValue));
 
   // 2. Monthly Rental Income (active leases rent sum)
   const activeLeases = leases.filter((l) => l.status === "active");
-  const monthlyRentalIncome = activeLeases.reduce((sum, l) => sum + (l.monthlyRent || 0), 0);
+  const monthlyRentalIncome = sumNullable(activeLeases.map((l) => l.monthlyRent));
 
   // 3. Net Cash Flow (this month's collected rents minus this month's recorded expenses)
   const now = new Date();
   const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-  const collectedThisMonth = payments
+  const collectedThisMonth = sumNullable(payments
     .filter((p) => {
       const d = new Date(p.dueDate);
       return d >= startOfThisMonth && d <= endOfThisMonth;
     })
-    .reduce((sum, p) => sum + p.amountReceived, 0);
+    .map((p) => p.amountReceived));
 
-  const expensesThisMonth = expenses
+  const expensesThisMonth = sumNullable(expenses
     .filter((e) => {
       const d = new Date(e.date);
       return d >= startOfThisMonth && d <= endOfThisMonth;
     })
-    .reduce((sum, e) => sum + e.amount, 0);
+    .map((e) => e.amount));
 
-  const netCashFlow = collectedThisMonth - expensesThisMonth;
+  const netCashFlow = collectedThisMonth == null || expensesThisMonth == null
+    ? null
+    : collectedThisMonth - expensesThisMonth;
 
   // 4. Occupancy Rate
   const allUnits = properties.flatMap((p) => p.units || []);
@@ -232,13 +235,14 @@ export default function PortfolioOverviewPage() {
   const overdueRents = payments.filter((p) => p.status === "overdue");
   const expiringLeases = leases.filter((l) => l.status === "active" && l.daysUntilExpiry <= 90);
   const vacantUnits = allUnits.filter((u) => u.status === "vacant");
-  const recentSpikes = expenses.filter((e) => e.amount > 30000); // over $300
+  const recentSpikes = expenses.filter((e) => e.amount != null && e.amount > 30000); // over $300
 
   // Count decisions needed
   const decisionsCount = overdueRents.length + expiringLeases.length + vacantUnits.length;
 
   // Render chart scales
-  const maxChartVal = Math.max(...trends.flatMap((t) => [t.collected, t.projected, t.expenses]), 1000) || 5000;
+  const trendValues = trends.flatMap((t) => [t.collected, t.projected, t.expenses]).filter((value): value is number => value != null);
+  const maxChartVal = Math.max(...trendValues, 1000);
 
   return (
     <div className="flex flex-col bg-background min-h-screen text-foreground">
@@ -273,7 +277,7 @@ export default function PortfolioOverviewPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Portfolio Value</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${portfolioValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(portfolioValue)}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Estimated asset base</p>
           </div>
@@ -282,7 +286,7 @@ export default function PortfolioOverviewPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Monthly Rent</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${monthlyRentalIncome.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(monthlyRentalIncome)}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Active lease values</p>
           </div>
@@ -290,8 +294,8 @@ export default function PortfolioOverviewPage() {
           {/* Net Cash Flow */}
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Net Cash Flow</p>
-            <h3 className={`text-2xl font-serif font-bold ${netCashFlow < 0 ? "text-danger" : "text-foreground"}`}>
-              ${netCashFlow.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            <h3 className={`text-2xl font-serif font-bold ${netCashFlow != null && netCashFlow < 0 ? "text-danger" : "text-foreground"}`}>
+              {formatCurrency(netCashFlow)}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">This month cash basis</p>
           </div>
@@ -344,9 +348,9 @@ export default function PortfolioOverviewPage() {
           {/* Premium CSS Bar Chart */}
           <div className="h-72 w-full flex items-end justify-between pt-4 border-b border-neutral-200 px-4 font-sans text-xs">
             {trends.map((t) => {
-              const colHeight = `${(t.collected / maxChartVal) * 100}%`;
-              const projHeight = `${(t.projected / maxChartVal) * 100}%`;
-              const expHeight = `${(t.expenses / maxChartVal) * 100}%`;
+              const colHeight = t.collected == null ? "0%" : `${(t.collected / maxChartVal) * 100}%`;
+              const projHeight = t.projected == null ? "0%" : `${(t.projected / maxChartVal) * 100}%`;
+              const expHeight = t.expenses == null ? "0%" : `${(t.expenses / maxChartVal) * 100}%`;
 
               return (
                 <div key={t.month} className="flex-1 flex flex-col items-center max-w-[80px] h-full group">
@@ -354,9 +358,9 @@ export default function PortfolioOverviewPage() {
                     {/* Tooltip Overlay */}
                     <div className="absolute hidden group-hover:flex flex-col bg-neutral-900 text-white text-[10px] p-2.5 rounded-md -top-12 z-10 shadow-lg pointer-events-none min-w-[120px] font-sans">
                       <p className="font-bold border-b border-neutral-700 pb-1 mb-1">{t.month}</p>
-                      <p>Collected: ${t.collected.toLocaleString()}</p>
-                      <p>Projected: ${t.projected.toLocaleString()}</p>
-                      <p>Expenses: ${t.expenses.toLocaleString()}</p>
+                      <p>Collected: {formatCurrency(t.collected)}</p>
+                      <p>Projected: {formatCurrency(t.projected)}</p>
+                      <p>Expenses: {formatCurrency(t.expenses)}</p>
                     </div>
 
                     {/* Expenses Bar */}
@@ -427,7 +431,7 @@ export default function PortfolioOverviewPage() {
                     <div>
                       <h4 className="text-sm font-semibold font-sans">Operating Expense Spikes</h4>
                       <p className="text-xs text-muted font-sans mt-1">
-                        A large expense of <strong>${e.amount.toLocaleString()}</strong> was recorded for <strong>{e.category.replace(/_/g, ' ')}</strong> at {e.propertyNickname}.
+                        A large expense of <strong>{formatCurrency(e.amount)}</strong> was recorded for <strong>{e.category.replace(/_/g, ' ')}</strong> at {e.propertyNickname}.
                       </p>
                       <Link
                         href={`/expenses`}
@@ -462,7 +466,7 @@ export default function PortfolioOverviewPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-danger font-serif">
-                        +${(p.amountDue - p.amountReceived).toLocaleString()}
+                        +{formatCurrency(p.amountDue == null || p.amountReceived == null ? null : p.amountDue - p.amountReceived)}
                       </p>
                       <Link
                         href="/cashflow"
@@ -519,7 +523,7 @@ export default function PortfolioOverviewPage() {
                 {Object.entries(
                   properties.reduce((acc: Record<string, number>, p) => {
                     const typeFormatted = p.propertyType.replace(/_/g, " ");
-                    acc[typeFormatted] = (acc[typeFormatted] || 0) + 1;
+                    acc[typeFormatted] = (acc[typeFormatted] ?? 0) + 1;
                     return acc;
                   }, {})
                 ).map(([type, count]) => (
@@ -541,15 +545,20 @@ export default function PortfolioOverviewPage() {
                       const d = new Date(e.date);
                       return d >= startOfThisMonth && d <= endOfThisMonth;
                     })
-                    .reduce((acc: Record<string, number>, e) => {
+                    .reduce((acc: Record<string, number | null>, e) => {
                       const catFormatted = e.category.replace(/_/g, " ");
-                      acc[catFormatted] = (acc[catFormatted] || 0) + e.amount;
+                      const current = acc[catFormatted];
+                      acc[catFormatted] = e.amount == null || current === null
+                        ? null
+                        : current === undefined
+                          ? e.amount
+                          : current + e.amount;
                       return acc;
                     }, {})
                 ).map(([category, amount]) => (
                   <div key={category} className="flex justify-between py-2 text-xs font-sans">
                     <span className="capitalize text-muted">{category}</span>
-                    <span className="font-semibold text-foreground">${(amount as number).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(amount as number | null | undefined)}</span>
                   </div>
                 ))}
                 {expenses.filter(e => {

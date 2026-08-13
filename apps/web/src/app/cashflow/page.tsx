@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import { Plus, Edit3, Archive, Filter, Search, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { formatCurrency, formatDate, sumNullable } from "@/lib/format";
 
 
 interface Lease {
@@ -33,9 +34,9 @@ interface Payment {
   leaseId: string;
   propertyId: string;
   unitId: string;
-  amountDue: number;
-  amountReceived: number;
-  dueDate: string;
+  amountDue: number | null;
+  amountReceived: number | null;
+  dueDate: string | null;
   paidDate: string | null;
   status: "upcoming" | "paid" | "partial" | "overdue" | "waived";
   paymentMethod: string | null;
@@ -170,9 +171,9 @@ export default function CashFlowPage() {
     setPropertyId(p.propertyId);
     setUnitId(p.unitId);
     setLeaseId(p.leaseId);
-    setAmountDue(p.amountDue.toString());
-    setAmountReceived(p.amountReceived.toString());
-    setDueDate(p.dueDate.split("T")[0]);
+    setAmountDue(p.amountDue == null ? "" : p.amountDue.toString());
+    setAmountReceived(p.amountReceived == null ? "" : p.amountReceived.toString());
+    setDueDate(p.dueDate == null ? "" : p.dueDate.split("T")[0]);
     setPaidDate(p.paidDate ? p.paidDate.split("T")[0] : "");
     setStatus(p.status);
     setPaymentMethod(p.paymentMethod || "");
@@ -222,13 +223,12 @@ export default function CashFlowPage() {
   };
 
   // Summaries
-  const totalCollected = payments.reduce((sum, p) => sum + p.amountReceived, 0);
-  const totalOverdue = payments
-    .filter((p) => p.status === "overdue")
-    .reduce((sum, p) => sum + (p.amountDue - p.amountReceived), 0);
-  const totalUpcoming = payments
-    .filter((p) => p.status === "upcoming")
-    .reduce((sum, p) => sum + p.amountDue, 0);
+  const totalCollected = sumNullable(payments.map((p) => p.amountReceived));
+  const overduePayments = payments.filter((p) => p.status === "overdue");
+  const totalOverdue = overduePayments.some((p) => p.amountDue == null || p.amountReceived == null)
+    ? null
+    : overduePayments.reduce((sum, p) => sum + (p.amountDue as number) - (p.amountReceived as number), 0);
+  const totalUpcoming = sumNullable(payments.filter((p) => p.status === "upcoming").map((p) => p.amountDue));
 
   // Filters
   const filteredPayments = payments.filter((p) => {
@@ -270,7 +270,7 @@ export default function CashFlowPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Rent Collected</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${totalCollected.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(totalCollected)}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Cumulated operational inflow</p>
           </div>
@@ -278,7 +278,7 @@ export default function CashFlowPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Delinquent / Overdue</p>
             <h3 className="text-2xl font-serif font-bold text-danger">
-              ${totalOverdue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(totalOverdue)}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Rent balances outstanding</p>
           </div>
@@ -286,7 +286,7 @@ export default function CashFlowPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Upcoming Projected</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${totalUpcoming.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(totalUpcoming)}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Rent scheduled in current leases</p>
           </div>
@@ -353,13 +353,13 @@ export default function CashFlowPage() {
                           {p.propertyNickname} • Unit {p.unitNumber}
                         </td>
                         <td className="px-6 py-4 text-xs">
-                          {new Date(p.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          {formatDate(p.dueDate)}
                         </td>
                         <td className="px-6 py-4 text-right font-semibold">
-                          ${p.amountDue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          {formatCurrency(p.amountDue)}
                         </td>
                         <td className="px-6 py-4 text-right font-semibold">
-                          ${p.amountReceived.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          {formatCurrency(p.amountReceived)}
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold">
                           <span

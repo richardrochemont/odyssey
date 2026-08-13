@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import Header from "@/components/Header";
+import { formatDate } from "@/lib/format";
 import {
   CheckSquare,
   Plus,
@@ -312,7 +313,7 @@ export default function TasksPage() {
                         </span>
 
                         <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" /> Due: {new Date(task.dueDate).toLocaleDateString()}
+                          <Calendar className="h-3 w-3" /> Due: {formatDate(task.dueDate)}
                           {isOverdue && <span className="text-danger font-extrabold">(OVERDUE)</span>}
                           {isDueToday && <span className="text-warning font-extrabold">(TODAY)</span>}
                         </span>

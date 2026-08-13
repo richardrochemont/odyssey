@@ -14,14 +14,15 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface LedgerRecord {
   id: string;
   propertyId: string;
   unitId: string | null;
   type: "income" | "expense";
-  amount: number; // in dollars
-  date: string;
+  amount: number | null; // in dollars
+  date: string | null;
   category: string;
   notes: string | null;
   propertyNickname: string;
@@ -29,11 +30,11 @@ interface LedgerRecord {
 }
 
 interface Summary {
-  scheduledRent: number;
-  recordedRent: number;
-  totalIncome: number;
-  totalExpenses: number;
-  netOperatingIncome: number;
+  scheduledRent: number | null;
+  recordedRent: number | null;
+  totalIncome: number | null;
+  totalExpenses: number | null;
+  netOperatingIncome: number | null;
   notes: string;
 }
 
@@ -221,7 +222,7 @@ export default function FinancialsPage() {
                 <Calendar className="h-4.5 w-4.5 text-primary" />
               </div>
               <p className="text-2xl font-extrabold text-foreground">
-                {summary.scheduledRent.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                {formatCurrency(summary.scheduledRent)}
               </p>
               <p className="text-[10px] text-muted mt-1 font-medium">Contracted active lease totals</p>
             </div>
@@ -232,7 +233,7 @@ export default function FinancialsPage() {
                 <TrendingUp className="h-4.5 w-4.5 text-success" />
               </div>
               <p className="text-2xl font-extrabold text-success">
-                {summary.recordedRent.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                {formatCurrency(summary.recordedRent)}
               </p>
               <p className="text-[10px] text-muted mt-1 font-medium">Actual rent payments logged</p>
             </div>
@@ -243,7 +244,7 @@ export default function FinancialsPage() {
                 <TrendingDown className="h-4.5 w-4.5 text-danger" />
               </div>
               <p className="text-2xl font-extrabold text-danger">
-                {summary.totalExpenses.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                {formatCurrency(summary.totalExpenses)}
               </p>
               <p className="text-[10px] text-muted mt-1 font-medium">Repairs & property overheads</p>
             </div>
@@ -253,8 +254,8 @@ export default function FinancialsPage() {
                 <span>Net Operating Income</span>
                 <DollarSign className="h-4.5 w-4.5 text-primary" />
               </div>
-              <p className={`text-2xl font-extrabold ${summary.netOperatingIncome >= 0 ? "text-primary" : "text-danger"}`}>
-                {summary.netOperatingIncome.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+              <p className={`text-2xl font-extrabold ${summary.netOperatingIncome != null && summary.netOperatingIncome < 0 ? "text-danger" : "text-primary"}`}>
+                {formatCurrency(summary.netOperatingIncome)}
               </p>
               <p className="text-[10px] text-muted mt-1 font-medium">Recorded income minus expenses</p>
             </div>
@@ -292,7 +293,7 @@ export default function FinancialsPage() {
                   {records.map((r) => (
                     <tr key={r.id} className="border-b border-border hover:bg-background/20">
                       <td className="py-3.5 px-4 font-semibold text-foreground">
-                        {new Date(r.date).toLocaleDateString()}
+                        {formatDate(r.date)}
                       </td>
                       <td className="py-3.5 px-4 leading-normal text-muted">
                         {r.propertyNickname} {r.unitNumber ? `• Unit ${r.unitNumber}` : ""}
@@ -314,7 +315,7 @@ export default function FinancialsPage() {
                         r.type === "income" ? "text-success" : "text-danger"
                       }`}>
                         {r.type === "income" ? "+" : "-"}
-                        {r.amount.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                        {formatCurrency(r.amount)}
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         {!isReadOnly && (

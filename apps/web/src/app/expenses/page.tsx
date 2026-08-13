@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import { Plus, Archive, Search, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { formatCurrency, formatDate, sumNullable } from "@/lib/format";
 
 interface Property {
   id: string;
@@ -18,8 +19,8 @@ interface Expense {
   propertyId: string;
   unitId: string | null;
   type: string;
-  amount: number;
-  date: string;
+  amount: number | null;
+  date: string | null;
   category: string;
   notes: string | null;
   propertyNickname: string;
@@ -164,18 +165,19 @@ export default function ExpensesPage() {
   };
 
   // Summaries
-  const totalExpensesYTD = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalExpensesYTD = sumNullable(expenses.map((e) => e.amount));
 
   const now = new Date();
   const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
   
-  const totalExpensesMonth = expenses
+  const totalExpensesMonth = sumNullable(expenses
     .filter((e) => {
+      if (e.date == null) return false;
       const d = new Date(e.date);
       return d >= startOfThisMonth && d <= endOfThisMonth;
     })
-    .reduce((sum, e) => sum + e.amount, 0);
+    .map((e) => e.amount));
 
   // Filters
   const filteredExpenses = expenses.filter((e) => {
@@ -218,7 +220,7 @@ export default function ExpensesPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Expenses This Month</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${totalExpensesMonth.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(totalExpensesMonth)}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Cash basis current month</p>
           </div>
@@ -226,7 +228,7 @@ export default function ExpensesPage() {
           <div className="bg-white border border-border p-6 rounded-md shadow-sm">
             <p className="text-[10px] font-bold text-muted uppercase tracking-widest font-sans mb-1">Expenses YTD</p>
             <h3 className="text-2xl font-serif font-bold text-foreground">
-              ${totalExpensesYTD.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(totalExpensesYTD)}
             </h3>
             <p className="text-[11px] text-muted font-sans mt-1">Year to date accumulated</p>
           </div>
@@ -312,10 +314,10 @@ export default function ExpensesPage() {
                           {e.propertyNickname} {e.unitNumber ? `• Unit ${e.unitNumber}` : ""}
                         </td>
                         <td className="px-6 py-4 text-xs">
-                          {new Date(e.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          {formatDate(e.date)}
                         </td>
                         <td className="px-6 py-4 text-right font-semibold text-foreground">
-                          ${e.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          {formatCurrency(e.amount)}
                         </td>
                         <td className="px-6 py-4 text-xs text-muted max-w-[200px] truncate">{e.notes || "—"}</td>
                         {user?.role !== "read_only" && (

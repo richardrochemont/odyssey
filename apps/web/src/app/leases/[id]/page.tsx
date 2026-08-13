@@ -14,6 +14,7 @@ import {
   ClipboardCopy
 } from "lucide-react";
 import Link from "next/link";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 
 interface LeaseDetails {
   id: string;
@@ -94,7 +95,7 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
         },
         body: JSON.stringify({
           context: "lease",
-          text: `Draft a renewal offer for tenant ${lease?.tenantName} whose lease ends on ${lease ? new Date(lease.endDate).toLocaleDateString() : ""}. Monthly rent is currently $${lease ? lease.monthlyRent.toLocaleString() : ""}.`,
+          text: `Draft a renewal offer for tenant ${lease?.tenantName} whose lease ends on ${formatDate(lease?.endDate)}. Monthly rent is currently ${formatCurrency(lease?.monthlyRent)}.`,
         }),
       });
       if (!res.ok) throw new Error("Failed to draft AI renewal offer");
@@ -168,7 +169,7 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
             <div>
               <p className="text-sm font-bold text-foreground font-serif">Renewal Review Recommended</p>
               <p className="text-xs mt-1 text-muted">
-                Lease agreement ends in <span className="font-semibold text-danger">{lease.daysUntilExpiry} days</span> on {new Date(lease.endDate).toLocaleDateString()}.
+                Lease agreement ends in <span className="font-semibold text-danger">{lease.daysUntilExpiry} days</span> on {formatDate(lease.endDate)}.
               </p>
             </div>
           </div>
@@ -191,7 +192,7 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
           <div className="bg-white border border-border px-6 py-4 rounded-md shadow-sm text-right">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Outstanding Balance</p>
             <p className={`text-xl font-serif font-bold ${outstandingBalance > 0 ? "text-danger" : "text-foreground"}`}>
-              ${outstandingBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatCurrency(outstandingBalance)}
             </p>
           </div>
         </div>
@@ -208,23 +209,23 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
                 <div>
                   <p className="font-bold text-muted uppercase tracking-wider text-[9px]">Monthly Rent</p>
                   <p className="text-base font-bold text-primary mt-1 font-serif">
-                    {currentRentDollars.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                    {formatCurrency(currentRentDollars)}
                   </p>
                 </div>
                 <div>
                   <p className="font-bold text-muted uppercase tracking-wider text-[9px]">Security Deposit</p>
                   <p className="text-base font-semibold text-foreground mt-1 font-serif">
-                    {lease.securityDeposit.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                    {formatCurrency(lease.securityDeposit)}
                   </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-muted uppercase tracking-wider text-[9px]">Start Date</p>
-                  <p className="font-medium text-foreground mt-1">{new Date(lease.startDate).toLocaleDateString()}</p>
+                  <p className="font-medium text-foreground mt-1">{formatDate(lease.startDate)}</p>
                 </div>
                 <div>
                   <p className="font-bold text-muted uppercase tracking-wider text-[9px]">End Date</p>
-                  <p className="font-medium text-foreground mt-1">{new Date(lease.endDate).toLocaleDateString()}</p>
+                  <p className="font-medium text-foreground mt-1">{formatDate(lease.endDate)}</p>
                 </div>
 
                 <div>
@@ -270,13 +271,13 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
                     <div key={p.id} className="flex items-center justify-between p-2.5 bg-background border border-border rounded-md">
                       <div>
                         <p className="font-semibold text-foreground">
-                          {new Date(p.dueDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                          {formatDate(p.dueDate)}
                         </p>
-                        <p className="text-[10px] text-muted">Due date: {new Date(p.dueDate).toLocaleDateString()}</p>
+                        <p className="text-[10px] text-muted">Due date: {formatDate(p.dueDate)}</p>
                       </div>
                       <div className="text-right flex items-center gap-3">
                         <div>
-                          <p className="font-semibold text-foreground">${p.amountReceived.toLocaleString()}</p>
+                          <p className="font-semibold text-foreground">{formatCurrency(p.amountReceived)}</p>
                           <p className="text-[9px] text-muted">Received</p>
                         </div>
                         <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] uppercase ${p.status === "paid" ? "bg-neutral-100 text-foreground" : "bg-danger/10 text-danger"}`}>
@@ -320,12 +321,12 @@ export default function LeaseDetailsPage({ params }: { params: { id: string } })
               <div className="grid grid-cols-2 gap-4 bg-background p-4 border border-border rounded-md text-xs">
                 <div>
                   <p className="font-bold text-muted uppercase text-[9px] tracking-wider">Current Rent</p>
-                  <p className="text-base font-bold text-primary font-serif mt-0.5">${currentRentDollars.toLocaleString()}</p>
+                  <p className="text-base font-bold text-primary font-serif mt-0.5">{formatCurrency(currentRentDollars)}</p>
                 </div>
                 <div>
                   <p className="font-bold text-muted uppercase text-[9px] tracking-wider">Suggested Renewal Range</p>
                   <p className="text-base font-bold text-foreground font-serif mt-0.5">
-                    ${suggestedMin.toLocaleString()} - ${suggestedMax.toLocaleString()}
+                    ${formatNumber(suggestedMin)} - ${formatNumber(suggestedMax)}
                   </p>
                 </div>
                 <div className="col-span-2 border-t border-border pt-3 mt-1 text-[11px] text-muted space-y-1.5 leading-relaxed">
