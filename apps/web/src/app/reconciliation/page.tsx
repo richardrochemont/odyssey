@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import { ShieldCheck, AlertTriangle, Calendar, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/format";
+import Link from "next/link";
 
 interface SummaryData {
   status: "no_data" | "summary_only" | "partial_detail" | "detail_complete" | "needs_review";
@@ -196,6 +197,11 @@ export default function ReconciliationPage() {
               </div>
               <h3 className="text-lg font-bold text-white">No financial data available for this month.</h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto">No historical monthly summary or transaction-level payments/expenses have been recorded for the selected property and month.</p>
+              {user?.role === "owner" && (
+                <Link href="/import" className="inline-block text-xs text-indigo-400 hover:text-indigo-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded-sm">
+                  Import data to reconcile this month
+                </Link>
+              )}
             </div>
           ) : (
             <div className="space-y-8">

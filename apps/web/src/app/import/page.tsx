@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import Header from "@/components/Header";
 import { Upload, CheckCircle2, AlertTriangle, Play, RefreshCw, BarChart2, Download } from "lucide-react";
@@ -18,17 +18,39 @@ interface ImportRun {
   createdAt: string;
 }
 
+const IMPORT_TYPES = ["properties", "units", "tenants", "leases", "payments", "expenses", "monthly_summaries"] as const;
+type ImportType = (typeof IMPORT_TYPES)[number];
+
+const importTypeLabels: Record<ImportType, string> = {
+  properties: "Properties",
+  units: "Units",
+  tenants: "Tenants",
+  leases: "Leases",
+  payments: "Payments",
+  expenses: "Expenses",
+  monthly_summaries: "Monthly Summaries",
+};
+
+function isImportType(value: string | null): value is ImportType {
+  return value !== null && IMPORT_TYPES.includes(value as ImportType);
+}
+
 export default function ImportPage() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
 
   const [csvContent, setCsvContent] = useState("");
   const [fileName, setFileName] = useState("");
-  const [importType, setImportType] = useState<"properties" | "units" | "tenants" | "leases" | "payments" | "expenses" | "monthly_summaries">("properties");
+  const [importType, setImportType] = useState<ImportType>("properties");
   const [headers, setHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const requestedType = new URLSearchParams(window.location.search).get("type");
+    setImportType(isImportType(requestedType) ? requestedType : "properties");
+  }, []);
 
   // Expected fields per import type
   const expectedFieldsMap: Record<string, string[]> = {
@@ -205,20 +227,21 @@ export default function ImportPage() {
                   <p className="text-slate-400 text-sm mb-6">Select the entity type, map custom headers, and process real estate records without external invitations or side-effects.</p>
                   
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                    {Object.keys(expectedFieldsMap).map((type) => (
+                    {IMPORT_TYPES.map((type) => (
                       <button
                         key={type}
                         onClick={() => {
-                          setImportType(type as any);
+                          setImportType(type);
                           setHeaders([]);
                         }}
-                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold capitalize transition-all duration-300 ${
+                        aria-pressed={importType === type}
+                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-300 ${
                           importType === type
                             ? "bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-indigo-900/30"
                             : "bg-[#181A25] border-slate-800 text-slate-400 hover:border-slate-700"
                         }`}
                       >
-                        {type.replace("_", " ")}
+                        {importTypeLabels[type]}
                       </button>
                     ))}
                   </div>

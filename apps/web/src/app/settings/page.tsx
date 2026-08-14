@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { formatDate } from "@/lib/format";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
-import { Users, Building2, ShieldCheck } from "lucide-react";
+import { Users, Building2, ShieldCheck, Database } from "lucide-react";
 
 export default function SettingsPage() {
   const { user, workspaces } = useAuth();
@@ -68,6 +68,23 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+
+            <section aria-labelledby="data-import-settings-title" className="bg-white border border-border p-6 rounded-md shadow-sm">
+              <div className="flex items-start gap-3 mb-5">
+                <div className="p-2.5 bg-neutral-100 text-primary rounded-full">
+                  <Database className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 id="data-import-settings-title" className="text-base font-semibold font-serif text-foreground">Data import &amp; exports</h3>
+                  <p className="text-xs text-muted mt-1">Manage property, tenant, lease, and historical financial data imports.</p>
+                </div>
+              </div>
+              <nav aria-label="Data import and export settings" className="flex flex-wrap gap-2">
+                <Link href="/import" className="px-3 py-2 text-xs font-bold text-white bg-primary hover:bg-neutral-800 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">Import CSV data</Link>
+                <Link href="/import" className="px-3 py-2 text-xs font-bold text-foreground bg-white hover:bg-neutral-50 border border-border rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">Download CSV templates</Link>
+                <Link href="/import" className="px-3 py-2 text-xs font-bold text-foreground bg-white hover:bg-neutral-50 border border-border rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">View import history</Link>
+              </nav>
+            </section>
 
             {/* Quick Links */}
             <div className="bg-white border border-border p-6 rounded-md shadow-sm flex items-center justify-between">

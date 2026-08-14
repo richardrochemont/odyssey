@@ -82,6 +82,11 @@ interface Trend {
   expenses: number | null;
 }
 
+interface ImportRun {
+  id: string;
+  status: "pending" | "processing" | "completed" | "failed";
+}
+
 export default function PortfolioOverviewPage() {
   const { token, user, isLoading: authLoading } = useAuth();
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
@@ -139,6 +144,12 @@ export default function PortfolioOverviewPage() {
     enabled: !!token,
   });
 
+  const { data: importRuns = [], isLoading: importRunsLoading } = useQuery<ImportRun[]>({
+    queryKey: ["import-runs", token],
+    queryFn: () => fetchWithAuth("/imports/runs"),
+    enabled: !!token && user?.role === "owner",
+  });
+
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseForm.propertyId || !expenseForm.amount) return;
@@ -179,7 +190,7 @@ export default function PortfolioOverviewPage() {
     }
   };
 
-  if (authLoading || propsLoading || leasesLoading || paymentsLoading || expensesLoading || trendsLoading) {
+  if (authLoading || propsLoading || leasesLoading || paymentsLoading || expensesLoading || trendsLoading || (user?.role === "owner" && importRunsLoading)) {
     return (
       <div className="flex flex-col bg-background min-h-screen">
         <div className="h-[68px] bg-white border-b border-border w-full" />
@@ -243,6 +254,8 @@ export default function PortfolioOverviewPage() {
   // Render chart scales
   const trendValues = trends.flatMap((t) => [t.collected, t.projected, t.expenses]).filter((value): value is number => value != null);
   const maxChartVal = Math.max(...trendValues, 1000);
+  const hasSuccessfulImport = importRuns.some((run) => run.status === "completed");
+  const showOwnerImportOnboarding = user?.role === "owner" && !hasSuccessfulImport;
 
   return (
     <div className="flex flex-col bg-background min-h-screen text-foreground">
@@ -270,6 +283,25 @@ export default function PortfolioOverviewPage() {
             </span>
           </div>
         </div>
+
+        {showOwnerImportOnboarding && (
+          <section aria-labelledby="csv-onboarding-title" className="bg-white border border-border px-5 py-4 rounded-md shadow-sm mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="max-w-2xl">
+                <h2 id="csv-onboarding-title" className="text-base font-serif font-bold text-foreground">Get started with your rental data</h2>
+                <p className="text-xs text-muted mt-1">Import properties, tenants, leases, and financial history from CSV.</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                <Link href="/import" className="inline-flex items-center justify-center px-4 py-2 bg-primary text-white text-xs font-semibold rounded hover:bg-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors">
+                  Import data
+                </Link>
+                <Link href="/import" className="inline-flex items-center justify-center px-4 py-2 border border-border text-foreground text-xs font-semibold rounded hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors">
+                  Download templates
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* 5 Premium Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
