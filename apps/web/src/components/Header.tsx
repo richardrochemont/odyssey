@@ -25,6 +25,84 @@ import SearchPalette from "./SearchPalette";
 import AssistantPanel from "./AssistantPanel";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
 
+type Role = "owner" | "manager" | "accountant" | "maintenance" | "read_only";
+
+interface NavLinkPillar {
+  type: "link";
+  name: string;
+  href: string;
+  roles: Role[];
+  matchPaths: string[];
+}
+
+interface NavDropdownPillar {
+  type: "dropdown";
+  name: string;
+  roles: Role[];
+  children: { name: string; href: string }[];
+  matchPaths: string[];
+}
+
+type NavPillar = NavLinkPillar | NavDropdownPillar;
+
+// Single source of truth for the primary nav: which pillars exist, which
+// roles may see them, and which routes count as "active" for each one.
+// Desktop and mobile both read this list instead of each hardcoding routes.
+const NAV_PILLARS: NavPillar[] = [
+  {
+    type: "link",
+    name: "Portfolio",
+    href: "/",
+    roles: ["owner", "manager", "maintenance", "read_only"],
+    matchPaths: ["/", "/properties"],
+  },
+  {
+    type: "link",
+    name: "Tenants",
+    href: "/leases",
+    roles: ["owner", "manager", "maintenance", "read_only"],
+    matchPaths: ["/leases"],
+  },
+  {
+    type: "dropdown",
+    name: "Money",
+    roles: ["owner", "manager", "read_only"],
+    children: [
+      { name: "Cash Flow", href: "/cashflow" },
+      { name: "Expenses", href: "/expenses" },
+      { name: "Financials", href: "/financials" },
+      { name: "Reconciliation", href: "/reconciliation" },
+    ],
+    matchPaths: ["/cashflow", "/expenses", "/financials", "/reconciliation"],
+  },
+  {
+    type: "link",
+    name: "Tasks",
+    href: "/tasks",
+    roles: ["owner", "manager", "accountant", "maintenance", "read_only"],
+    matchPaths: ["/tasks"],
+  },
+];
+
+// "/" only matches the exact root path so it never swallows every route.
+function isPillarActive(pathname: string, matchPaths: string[]): boolean {
+  return matchPaths.some((base) =>
+    base === "/" ? pathname === "/" : pathname === base || pathname.startsWith(`${base}/`)
+  );
+}
+
+function navLinkClass(isActive: boolean): string {
+  return `text-xs font-semibold uppercase tracking-wider relative flex items-center h-full px-1 border-b-[2px] transition-colors focus:outline-none focus:border-primary ${
+    isActive ? "border-primary text-foreground" : "border-transparent text-muted hover:text-foreground"
+  }`;
+}
+
+function mobileNavLinkClass(isActive: boolean): string {
+  return `flex items-center min-h-11 px-3 py-2.5 rounded text-xs font-semibold uppercase tracking-wider transition-colors ${
+    isActive ? "bg-neutral-100 text-foreground" : "text-muted hover:bg-neutral-50 hover:text-foreground"
+  }`;
+}
+
 export default function Header() {
   const { user, logout, token, workspaces, switchWorkspace } = useAuth();
   const pathname = usePathname();
@@ -34,9 +112,13 @@ export default function Header() {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
+  const [isMoneyMenuOpen, setIsMoneyMenuOpen] = useState(false);
+  const [isMobileMoneyExpanded, setIsMobileMoneyExpanded] = useState(false);
 
   const addMenuRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const moneyMenuRef = useRef<HTMLDivElement>(null);
+  const moneyTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Close dropdowns on outside click or ESC key
   useEffect(() => {
@@ -47,6 +129,9 @@ export default function Header() {
       if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
         setIsProfileMenuOpen(false);
       }
+      if (moneyMenuRef.current && !moneyMenuRef.current.contains(e.target as Node)) {
+        setIsMoneyMenuOpen(false);
+      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -54,6 +139,11 @@ export default function Header() {
         setIsAddMenuOpen(false);
         setIsProfileMenuOpen(false);
         setIsMobileMenuOpen(false);
+        setIsMobileMoneyExpanded(false);
+        if (isMoneyMenuOpen) {
+          setIsMoneyMenuOpen(false);
+          moneyTriggerRef.current?.focus();
+        }
       }
       // Cmd/Ctrl + K shortcut for Search Palette
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -68,49 +158,17 @@ export default function Header() {
       document.removeEventListener("mousedown", handleOutsideClick);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [isMoneyMenuOpen]);
 
   const roleLabels: Record<string, string> = {
     owner: "Portfolio Owner",
     manager: "Portfolio Manager",
+    accountant: "Accountant",
     maintenance: "Maintenance Lead",
     read_only: "Investor (Read-only)",
   };
 
-  const navItems = [
-    {
-      name: "Portfolio",
-      href: "/",
-      roles: ["owner", "manager", "maintenance", "read_only"],
-    },
-    {
-      name: "Properties",
-      href: "/properties",
-      roles: ["owner", "manager", "maintenance", "read_only"],
-    },
-    {
-      name: "Tenants",
-      href: "/leases",
-      roles: ["owner", "manager", "read_only"],
-    },
-    {
-      name: "Cash Flow",
-      href: "/cashflow",
-      roles: ["owner", "manager", "read_only"],
-    },
-    {
-      name: "Expenses",
-      href: "/expenses",
-      roles: ["owner", "manager", "read_only"],
-    },
-    {
-      name: "Documents",
-      href: "/documents",
-      roles: ["owner", "manager", "read_only"],
-    },
-  ];
-
-  const allowedNavItems = user ? navItems.filter((item) => item.roles.includes(user.role)) : [];
+  const allowedPillars = user ? NAV_PILLARS.filter((pillar) => pillar.roles.includes(user.role)) : [];
 
   // Determine decisions count for indicator
   const fetchWithAuth = async (path: string) => {
@@ -174,24 +232,80 @@ export default function Header() {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-5 h-[68px] overflow-x-auto scrollbar-none max-w-[500px] xl:max-w-none">
-            {allowedNavItems.map((item) => {
-              const isActive =
-                pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          <nav
+            className="hidden lg:flex items-center gap-5 h-[68px] max-w-[500px] xl:max-w-none"
+            aria-label="Primary"
+          >
+            {allowedPillars.map((pillar) => {
+              const isActive = isPillarActive(pathname, pillar.matchPaths);
+
+              if (pillar.type === "link") {
+                return (
+                  <Link
+                    key={pillar.name}
+                    href={pillar.href}
+                    className={navLinkClass(isActive)}
+                    data-testid={`nav-link-${pillar.name.toLowerCase()}`}
+                    data-active={isActive ? "true" : "false"}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    {pillar.name}
+                  </Link>
+                );
+              }
+
               return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`text-xs font-semibold uppercase tracking-wider relative flex items-center h-full px-1 border-b-[2px] transition-colors focus:outline-none focus:border-primary ${
-                    isActive
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted hover:text-foreground"
-                  }`}
-                  data-testid={`nav-link-${item.name.toLowerCase()}`}
-                  data-active={isActive ? "true" : "false"}
-                >
-                  {item.name}
-                </Link>
+                <div className="relative h-full flex items-center" ref={moneyMenuRef} key={pillar.name}>
+                  <button
+                    ref={moneyTriggerRef}
+                    type="button"
+                    onClick={() => setIsMoneyMenuOpen((prev) => !prev)}
+                    className={`${navLinkClass(isActive)} gap-1`}
+                    aria-haspopup="true"
+                    aria-expanded={isMoneyMenuOpen}
+                    aria-controls="money-nav-menu"
+                    aria-label="Money"
+                    aria-current={isActive ? "true" : undefined}
+                    data-testid="nav-link-money"
+                    data-active={isActive ? "true" : "false"}
+                  >
+                    {pillar.name}
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`h-3 w-3 transition-transform ${isMoneyMenuOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {isMoneyMenuOpen && (
+                    <div
+                      id="money-nav-menu"
+                      role="menu"
+                      aria-label="Money"
+                      className="absolute left-0 top-full mt-1 w-56 bg-white border border-border rounded shadow-lg py-1 z-50 text-xs font-medium font-sans animate-fade-in"
+                      data-testid="money-nav-menu"
+                    >
+                      {pillar.children.map((child) => {
+                        const childActive = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            role="menuitem"
+                            onClick={() => setIsMoneyMenuOpen(false)}
+                            className={`flex items-center px-3 py-2 min-h-11 text-foreground hover:bg-neutral-50 transition-colors ${
+                              childActive ? "font-bold text-primary" : ""
+                            }`}
+                            data-testid={`nav-link-money-${child.name.toLowerCase().replace(/\s+/g, "-")}`}
+                            data-active={childActive ? "true" : "false"}
+                            aria-current={childActive ? "page" : undefined}
+                          >
+                            {child.name}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>
@@ -450,24 +564,70 @@ export default function Header() {
               </div>
 
               {/* Navigation links */}
-              <nav className="space-y-1">
-                {allowedNavItems.map((item) => {
-                  const isActive =
-                    pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+              <nav className="space-y-1" aria-label="Primary">
+                {allowedPillars.map((pillar) => {
+                  const isActive = isPillarActive(pathname, pillar.matchPaths);
+
+                  if (pillar.type === "link") {
+                    return (
+                      <Link
+                        key={pillar.name}
+                        href={pillar.href}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={mobileNavLinkClass(isActive)}
+                        data-testid={`mobile-nav-link-${pillar.name.toLowerCase()}`}
+                        data-active={isActive ? "true" : "false"}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        {pillar.name}
+                      </Link>
+                    );
+                  }
+
                   return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded text-xs font-semibold uppercase tracking-wider transition-colors ${
-                        isActive
-                          ? "bg-neutral-100 text-foreground"
-                          : "text-muted hover:bg-neutral-50 hover:text-foreground"
-                      }`}
-                      data-testid={`mobile-nav-link-${item.name.toLowerCase()}`}
-                    >
-                      {item.name}
-                    </Link>
+                    <div key={pillar.name}>
+                      <button
+                        type="button"
+                        onClick={() => setIsMobileMoneyExpanded((prev) => !prev)}
+                        aria-expanded={isMobileMoneyExpanded}
+                        aria-controls="mobile-money-menu"
+                        className={`w-full flex items-center justify-between ${mobileNavLinkClass(isActive)}`}
+                        data-testid="mobile-nav-link-money"
+                        data-active={isActive ? "true" : "false"}
+                      >
+                        {pillar.name}
+                        <ChevronDown
+                          aria-hidden="true"
+                          className={`h-3.5 w-3.5 transition-transform ${isMobileMoneyExpanded ? "rotate-180" : ""}`}
+                        />
+                      </button>
+
+                      {isMobileMoneyExpanded && (
+                        <div id="mobile-money-menu" className="pl-3 mt-1 space-y-1">
+                          {pillar.children.map((child) => {
+                            const childActive = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                            return (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                onClick={() => {
+                                  setIsMobileMenuOpen(false);
+                                  setIsMobileMoneyExpanded(false);
+                                }}
+                                className={`flex items-center min-h-11 px-3 py-2 rounded text-xs font-semibold transition-colors ${
+                                  childActive ? "bg-neutral-100 text-foreground" : "text-muted hover:bg-neutral-50 hover:text-foreground"
+                                }`}
+                                data-testid={`mobile-nav-link-money-${child.name.toLowerCase().replace(/\s+/g, "-")}`}
+                                data-active={childActive ? "true" : "false"}
+                                aria-current={childActive ? "page" : undefined}
+                              >
+                                {child.name}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </nav>

@@ -19,15 +19,15 @@ async function main() {
 
   // Clear existing data
   console.log("Clearing existing data...");
+  await db.delete(schema.monthlyFinancialSummaries);
+  await db.delete(schema.propertyMonthFinancialCoverages);
+  await db.delete(schema.tasks);
   await db.delete(schema.paymentAllocations);
   await db.delete(schema.charges);
   await db.delete(schema.importRows);
-  await db.delete(schema.importRuns);
-  await db.delete(schema.importSources);
   await db.delete(schema.auditLogs);
   await db.delete(schema.payments);
   await db.delete(schema.financialRecords);
-  await db.delete(schema.tasks);
   await db.delete(schema.workOrders);
   await db.delete(schema.maintenanceRequests);
   await db.delete(schema.vendors);
@@ -36,9 +36,11 @@ async function main() {
   await db.delete(schema.units);
   await db.delete(schema.buildings);
   await db.delete(schema.properties);
-  await db.delete(schema.users);
+  await db.delete(schema.importRuns);
+  await db.delete(schema.importSources);
   await db.delete(schema.organizationInvitations);
   await db.delete(schema.organizationMemberships);
+  await db.delete(schema.users);
   await db.delete(schema.organizations);
 
   // 1. Create Organization
@@ -451,8 +453,10 @@ async function main() {
     description: "Walkthrough unit 202 to confirm shape and prep for cleaning schedule.",
     dueDate: new Date(),
     ownerId: managerUser.id,
-    status: "todo",
-    priority: "medium",
+    assigneeUserId: managerUser.id,
+    createdByUserId: ownerUser.id,
+    status: "inbox",
+    priority: "normal",
     type: "inspection",
     propertyId: propOakridge.id,
     unitId: oakUnits[4].id,
@@ -464,7 +468,9 @@ async function main() {
     description: "Review current lease terms. Lease expires soon (in 15 days). Send proposal.",
     dueDate: addDays(new Date(), 2),
     ownerId: ownerUser.id,
-    status: "todo",
+    assigneeUserId: ownerUser.id,
+    createdByUserId: ownerUser.id,
+    status: "inbox",
     priority: "high",
     type: "lease_renewal",
     propertyId: propOakridge.id,
@@ -479,8 +485,10 @@ async function main() {
     description: "Follow up with Apex regarding invoice and warranty terms for Oakridge 101 sink.",
     dueDate: subDays(new Date(), 2),
     ownerId: managerUser.id,
+    assigneeUserId: managerUser.id,
+    createdByUserId: ownerUser.id,
     status: "in_progress",
-    priority: "medium",
+    priority: "normal",
     type: "maintenance",
     propertyId: propOakridge.id,
     maintenanceRequestId: req1.id,

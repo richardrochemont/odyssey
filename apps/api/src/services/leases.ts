@@ -1,4 +1,4 @@
-import { db, leases, tenants, units, tasks, properties } from "@odyssey/db";
+import { db, leases, tenants, units, properties } from "@odyssey/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { logAction } from "./audit";
 import { LeaseCreateInput, TenantCreateInput } from "@odyssey/validation";
@@ -116,53 +116,16 @@ export async function getLeaseDetails(orgId: string, id: string) {
   return lease || null;
 }
 
-// Automatically check and generate a renewal review task if needed
+/**
+ * @deprecated Task Center is manual-only. Retained as a compatibility no-op so
+ * older callers cannot generate tasks during a rolling local upgrade.
+ */
 export async function checkAndGenerateRenewalTask(
-  orgId: string,
-  userId: string,
-  leaseId: string
+  _orgId: string,
+  _userId: string,
+  _leaseId: string
 ): Promise<void> {
-  const lease = await getLeaseDetails(orgId, leaseId);
-  if (!lease) return;
-
-  const msInDay = 24 * 60 * 60 * 1000;
-  const daysUntilExpiry = Math.ceil((new Date(lease.endDate).getTime() - new Date().getTime()) / msInDay);
-
-  if (daysUntilExpiry <= 90 && lease.status === "active") {
-    // Check if task already exists
-    const [existingTask] = await db.select()
-      .from(tasks)
-      .where(and(
-        eq(tasks.orgId, orgId),
-        eq(tasks.leaseId, leaseId),
-        eq(tasks.type, "lease_renewal"),
-        isNull(tasks.archivedAt)
-      ));
-
-    if (!existingTask) {
-      // Create automatic renewal-review task
-      const dueDate = new Date(lease.endDate);
-      dueDate.setDate(dueDate.getDate() - 60); // Due 60 days before expiration
-
-      // Ensure due date is not in the past
-      const finalDueDate = dueDate.getTime() < Date.now() ? new Date() : dueDate;
-
-      await db.insert(tasks).values({
-        orgId,
-        title: `Lease Renewal Review: ${lease.tenantName}`,
-        description: `Automatic System Alert: Lease for ${lease.tenantName} in ${lease.propertyNickname} Unit ${lease.unitNumber} expires on ${new Date(lease.endDate).toLocaleDateString()}. Please initiate the renewal process.`,
-        dueDate: finalDueDate,
-        ownerId: userId,
-        status: "todo",
-        priority: "high",
-        type: "lease_renewal",
-        propertyId: lease.propertyId,
-        unitId: lease.unitId,
-        tenantId: lease.primaryTenantId,
-        leaseId: lease.id,
-      });
-    }
-  }
+  return;
 }
 
 export async function createLease(orgId: string, userId: string, input: LeaseCreateInput) {
@@ -195,7 +158,7 @@ export async function createLease(orgId: string, userId: string, input: LeaseCre
       .where(eq(units.id, lease.unitId));
   }
 
-  // Trigger automatic renewal check
+  // Compatibility no-op: Task Center tasks are manual-only.
   await checkAndGenerateRenewalTask(orgId, userId, lease.id);
 
   return lease;
@@ -249,7 +212,7 @@ export async function updateLease(
       .where(eq(units.id, updated.unitId));
   }
 
-  // Trigger automatic renewal check
+  // Compatibility no-op: Task Center tasks are manual-only.
   await checkAndGenerateRenewalTask(orgId, userId, id);
 
   return updated;

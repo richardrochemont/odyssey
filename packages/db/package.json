@@ -9,6 +9,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
+    "db:preflight:tasks": "node dist/task-migration-preflight.js",
     "db:seed": "node dist/seed.js",
     "db:seed:users": "node dist/seed-users-only.js"
   },

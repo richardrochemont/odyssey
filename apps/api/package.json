@@ -8,6 +8,8 @@
     "dev": "tsc && node dist/server.js",
     "start": "node dist/server.js",
     "test": "node dist/services/run-security-tests.js && node dist/services/run-tests.js"
+    ,"test:task-center": "node dist/services/run-task-center-tests.js",
+    "test:task-center:integration": "node dist/services/run-task-center-integration-tests.js"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",

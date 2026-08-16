@@ -43,11 +43,28 @@ export const WorkOrderStatusEnum = z.enum([
 export type WorkOrderStatus = z.infer<typeof WorkOrderStatusEnum>;
 
 // Task Enums
-export const TaskStatusEnum = z.enum(["todo", "in_progress", "completed", "cancelled"]);
+export const TaskStatusEnum = z.enum(["inbox", "planned", "in_progress", "waiting", "completed", "cancelled"]);
 export type TaskStatus = z.infer<typeof TaskStatusEnum>;
 
-export const TaskTypeEnum = z.enum(["general", "maintenance", "lease_renewal", "inspection", "financial"]);
-export type TaskType = z.infer<typeof TaskTypeEnum>;
+export const TaskActiveStatusEnum = z.enum(["inbox", "planned", "in_progress", "waiting"]);
+export const TaskPriorityEnum = z.enum(["urgent", "high", "normal", "low"]);
+export type TaskPriority = z.infer<typeof TaskPriorityEnum>;
+
+const calendarDatePattern = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+export function isCalendarDate(value: string): boolean {
+  if (!calendarDatePattern.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return candidate.getUTCFullYear() === year
+    && candidate.getUTCMonth() === month - 1
+    && candidate.getUTCDate() === day;
+}
+
+export const CalendarDateSchema = z.string().refine(
+  isCalendarDate,
+  "Expected a real calendar date in YYYY-MM-DD format"
+);
 
 // Financial Enums
 export const FinancialRecordTypeEnum = z.enum(["income", "expense"]);
@@ -238,23 +255,58 @@ export const WorkOrderCreateSchema = z.object({
 export type WorkOrderCreateInput = z.infer<typeof WorkOrderCreateSchema>;
 
 // Task
+const NullableUuidSchema = z.string().uuid("Invalid ID").nullable().optional();
+
 export const TaskCreateSchema = z.object({
-  title: z.string().min(2, "Title must be at least 2 characters"),
-  description: z.string().optional(),
-  dueDate: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid due date"),
-  ownerId: z.string().uuid("Invalid user ID"),
-  status: TaskStatusEnum.default("todo"),
-  priority: MaintenancePriorityEnum.default("medium"),
-  type: TaskTypeEnum.default("general"),
-  propertyId: z.string().uuid("Invalid ID").optional().nullable(),
-  unitId: z.string().uuid("Invalid ID").optional().nullable(),
-  tenantId: z.string().uuid("Invalid ID").optional().nullable(),
-  leaseId: z.string().uuid("Invalid ID").optional().nullable(),
-  maintenanceRequestId: z.string().uuid("Invalid ID").optional().nullable(),
-  workOrderId: z.string().uuid("Invalid ID").optional().nullable(),
-  notes: z.string().optional(),
+  title: z.string().trim().min(1, "Title is required").max(255),
+  description: z.string().trim().max(10000).nullable().optional(),
+  dueDate: CalendarDateSchema.nullable().optional(),
+  assigneeUserId: NullableUuidSchema,
+  status: TaskActiveStatusEnum.default("inbox"),
+  priority: TaskPriorityEnum.default("normal"),
+  propertyId: NullableUuidSchema,
+  unitId: NullableUuidSchema,
+  tenantId: NullableUuidSchema,
+  leaseId: NullableUuidSchema,
+  paymentId: NullableUuidSchema,
+  financialRecordId: NullableUuidSchema,
+  reconciliationMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Expected YYYY-MM").nullable().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.reconciliationMonth && !value.propertyId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["propertyId"], message: "Property is required for a reconciliation month" });
+  }
 });
 export type TaskCreateInput = z.infer<typeof TaskCreateSchema>;
+
+export const TaskPatchSchema = TaskCreateSchema._def.schema.partial().superRefine((value, ctx) => {
+  if (value.reconciliationMonth && value.propertyId === null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["propertyId"], message: "Property is required for a reconciliation month" });
+  }
+});
+export type TaskPatchInput = z.infer<typeof TaskPatchSchema>;
+
+export const TaskReopenSchema = z.object({ status: TaskActiveStatusEnum.default("inbox") }).strict();
+
+export const TaskListQuerySchema = z.object({
+  status: z.string().optional(),
+  priority: z.string().optional(),
+  assigneeId: z.string().uuid().optional(),
+  assignee: z.literal("me").optional(),
+  unassigned: z.enum(["true", "false"]).optional(),
+  propertyId: z.string().uuid().optional(),
+  due: z.enum(["overdue", "today", "next_7_days", "none"]).optional(),
+  dueFrom: CalendarDateSchema.optional(),
+  dueTo: CalendarDateSchema.optional(),
+  sort: z.enum(["due_date", "priority", "newest", "updated"]).default("updated"),
+  direction: z.enum(["asc", "desc"]).default("desc"),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  archived: z.enum(["true", "false"]).optional(),
+}).strict().superRefine((value, ctx) => {
+  const assigneeFilters = [value.assigneeId, value.assignee, value.unassigned === "true"].filter(Boolean).length;
+  if (assigneeFilters > 1) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Assignee filters are mutually exclusive" });
+  if (value.due && (value.dueFrom || value.dueTo)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Due preset and range are mutually exclusive" });
+});
 
 // Financial Record
 export const FinancialRecordCreateSchema = z.object({
@@ -453,4 +505,3 @@ export const MonthlySummaryCSVSchema = z.object({
   sourceNote: z.string().optional().nullable(),
 });
 export type MonthlySummaryCSVInput = z.infer<typeof MonthlySummaryCSVSchema>;
-

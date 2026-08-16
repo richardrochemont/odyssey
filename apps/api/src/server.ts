@@ -70,7 +70,7 @@ async function startServer() {
   const corsOrigin = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim()).filter(Boolean);
   await app.register(cors, {
     origin: corsOrigin && corsOrigin.length > 0 ? corsOrigin : true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   });
 

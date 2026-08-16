@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { formatCurrency, sumNullable } from "@/lib/format";
+import TaskSummaryWidget from "@/components/TaskSummaryWidget";
 
 interface Unit {
   id: string;
@@ -350,6 +351,8 @@ export default function PortfolioOverviewPage() {
             <p className="text-[11px] text-muted font-sans mt-1">Requires user attention</p>
           </div>
         </div>
+
+        <TaskSummaryWidget />
 
         {/* Central 9-Month Cash-Flow Visualization */}
         <div className="bg-white border border-border p-6 rounded-md shadow-sm mb-8">

@@ -1,5 +1,5 @@
-import { pgTable, uuid, varchar, text, integer, boolean, timestamp, date, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { pgTable, uuid, varchar, text, integer, boolean, timestamp, date, jsonb, uniqueIndex, index, check } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
 
 // 1. Organizations (Multi-tenant scope)
 export const organizations = pgTable("organizations", {
@@ -270,22 +270,44 @@ export const tasks = pgTable("tasks", {
   orgId: uuid("org_id").references(() => organizations.id).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  dueDate: timestamp("due_date").notNull(),
+  // Task Center dates are calendar dates stored canonically at database midnight.
+  // Legacy non-midnight timestamps are preserved and serialized by date portion.
+  dueDate: timestamp("due_date"),
   ownerId: uuid("owner_id").references(() => users.id).notNull(),
-  status: varchar("status", { length: 50 }).notNull().default("todo"),
-  priority: varchar("priority", { length: 50 }).notNull().default("medium"),
+  assigneeUserId: uuid("assignee_user_id").references(() => users.id),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id).notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("inbox"),
+  priority: varchar("priority", { length: 50 }).notNull().default("normal"),
   type: varchar("type", { length: 50 }).notNull().default("general"),
   propertyId: uuid("property_id").references(() => properties.id),
   unitId: uuid("unit_id").references(() => units.id),
   tenantId: uuid("tenant_id").references(() => tenants.id),
   leaseId: uuid("lease_id").references(() => leases.id),
+  paymentId: uuid("payment_id").references(() => payments.id),
+  financialRecordId: uuid("financial_record_id").references(() => financialRecords.id),
+  reconciliationMonth: varchar("reconciliation_month", { length: 7 }),
   maintenanceRequestId: uuid("maintenance_request_id").references(() => maintenanceRequests.id),
   workOrderId: uuid("work_order_id").references(() => workOrders.id),
   notes: text("notes"),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   archivedAt: timestamp("archived_at"),
-});
+}, (table) => ({
+  statusCheck: check("tasks_status_check", sql`${table.status} in ('inbox', 'planned', 'in_progress', 'waiting', 'completed', 'cancelled')`),
+  priorityCheck: check("tasks_priority_check", sql`${table.priority} in ('urgent', 'high', 'normal', 'low')`),
+  titleNonblankCheck: check("tasks_title_nonblank_check", sql`length(btrim(${table.title})) > 0`),
+  reconciliationMonthFormatCheck: check("tasks_reconciliation_month_format_check", sql`${table.reconciliationMonth} is null or ${table.reconciliationMonth} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+  reconciliationMonthPropertyCheck: check("tasks_reconciliation_month_property_check", sql`${table.reconciliationMonth} is null or ${table.propertyId} is not null`),
+  completedAtStatusCheck: check("tasks_completed_at_status_check", sql`${table.completedAt} is null or ${table.status} = 'completed'`),
+  activeOrgStatusIdx: index("tasks_active_org_status_idx").on(table.orgId, table.status).where(sql`${table.archivedAt} is null`),
+  activeOrgAssigneeStatusIdx: index("tasks_active_org_assignee_status_idx").on(table.orgId, table.assigneeUserId, table.status).where(sql`${table.archivedAt} is null`),
+  activeOrgPriorityIdx: index("tasks_active_org_priority_idx").on(table.orgId, table.priority).where(sql`${table.archivedAt} is null`),
+  activeOrgDueDateIdx: index("tasks_active_org_due_date_idx").on(table.orgId, table.dueDate).where(sql`${table.archivedAt} is null`),
+  activeOrgUpdatedAtIdx: index("tasks_active_org_updated_at_idx").on(table.orgId, table.updatedAt).where(sql`${table.archivedAt} is null`),
+  activeOrgCreatedAtIdx: index("tasks_active_org_created_at_idx").on(table.orgId, table.createdAt).where(sql`${table.archivedAt} is null`),
+  activeOrgPropertyIdx: index("tasks_active_org_property_idx").on(table.orgId, table.propertyId).where(sql`${table.archivedAt} is null and ${table.propertyId} is not null`),
+}));
 
 // 12. Financial Records (Expenses & Historical Summaries)
 export const financialRecords = pgTable("financial_records", {
@@ -424,7 +446,9 @@ export const auditLogs = pgTable("audit_logs", {
   previousState: jsonb("previous_state"),
   newState: jsonb("new_state"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  orgEntityCreatedAtIdx: index("audit_logs_org_entity_created_at_idx").on(table.orgId, table.entityType, table.entityId, table.createdAt),
+}));
 
 // Relations Definitions
 export const organizationsRelations = relations(organizations, ({ many }) => ({

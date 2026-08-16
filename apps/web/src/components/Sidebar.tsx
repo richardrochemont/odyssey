@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Upload,
   RefreshCw,
+  CheckSquare,
 } from "lucide-react";
 import AssistantPanel from "./AssistantPanel";
 
@@ -29,6 +30,7 @@ export default function Sidebar() {
   const roleLabels: Record<string, string> = {
     owner: "Portfolio Owner",
     manager: "Portfolio Manager",
+    accountant: "Accountant",
     maintenance: "Maintenance Lead",
     read_only: "Investor (Read-only)",
   };
@@ -39,6 +41,12 @@ export default function Sidebar() {
       href: "/",
       icon: LayoutDashboard,
       roles: ["owner", "manager", "maintenance", "read_only"],
+    },
+    {
+      name: "Tasks",
+      href: "/tasks",
+      icon: CheckSquare,
+      roles: ["owner", "manager", "accountant", "maintenance", "read_only"],
     },
     {
       name: "Properties",
