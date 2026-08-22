@@ -23,6 +23,7 @@ import leaseRoutes from "./routes/leases";
 import maintenanceRoutes from "./routes/maintenance";
 import taskRoutes from "./routes/tasks";
 import financialRoutes from "./routes/financials";
+import growthRoutes from "./routes/growth";
 import aiRoutes from "./routes/ai";
 import paymentRoutes from "./routes/payments";
 import importRoutes from "./routes/imports";
@@ -82,9 +83,21 @@ async function startServer() {
   validateEmailConfig();
 
   // Rate Limiting (Redis-backed for cluster/production scalability)
+  //
+  // isE2ETestMode raises only the ceiling (max), never the window, keying,
+  // Redis backing, or global scope: a Playwright run drives real page loads
+  // (each firing ~10 app-shell requests) against the same shared budget a
+  // single interactive user would otherwise use, so 100/min is exhausted by
+  // the test suite alone, not by anything resembling abusive traffic. This
+  // mirrors the existing NODE_ENV/E2E_TEST_MODE gate in routes/auth.ts's
+  // /login rate limit and is never true outside a Playwright-driven run.
+  const isE2ETestMode =
+    process.env.NODE_ENV === "test" &&
+    process.env.E2E_TEST_MODE === "true";
+
   await app.register(rateLimit, {
     global: true,
-    max: 100,
+    max: isE2ETestMode ? 1000 : 100,
     timeWindow: "1 minute",
     redis: redis,
     allowList: ["/health", "/health/db", "/health/redis"],
@@ -151,6 +164,7 @@ async function startServer() {
   await app.register(maintenanceRoutes, { prefix: "/maintenance" });
   await app.register(taskRoutes, { prefix: "/tasks" });
   await app.register(financialRoutes, { prefix: "/financials" });
+  await app.register(growthRoutes, { prefix: "/growth" });
   await app.register(aiRoutes, { prefix: "/ai" });
   await app.register(paymentRoutes, { prefix: "/payments" });
   await app.register(importRoutes, { prefix: "/imports" });

@@ -505,3 +505,28 @@ export const MonthlySummaryCSVSchema = z.object({
   sourceNote: z.string().optional().nullable(),
 });
 export type MonthlySummaryCSVInput = z.infer<typeof MonthlySummaryCSVSchema>;
+
+// Growth Facts (read-only portfolio insights) — query-parameter validation only.
+// Deliberately has no orgId field: organization identity must never be accepted
+// from the request, and `.strict()` rejects any attempt to smuggle one in.
+export const ISODateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+export const GrowthSummaryQuerySchema = z.object({
+  periodStart: z.string().regex(ISODateRegex, "periodStart must be YYYY-MM-DD").optional(),
+  periodEnd: z.string().regex(ISODateRegex, "periodEnd must be YYYY-MM-DD").optional(),
+  comparisonStart: z.string().regex(ISODateRegex, "comparisonStart must be YYYY-MM-DD").optional(),
+  comparisonEnd: z.string().regex(ISODateRegex, "comparisonEnd must be YYYY-MM-DD").optional(),
+}).strict()
+  .refine(data => !!data.periodStart === !!data.periodEnd, {
+    message: "periodStart and periodEnd must be provided together",
+    path: ["periodEnd"],
+  })
+  .refine(data => !!data.comparisonStart === !!data.comparisonEnd, {
+    message: "comparisonStart and comparisonEnd must be provided together",
+    path: ["comparisonEnd"],
+  })
+  .refine(data => !(data.comparisonStart && !data.periodStart), {
+    message: "comparisonStart/comparisonEnd requires periodStart/periodEnd to also be provided",
+    path: ["periodStart"],
+  });
+export type GrowthSummaryQueryInput = z.infer<typeof GrowthSummaryQuerySchema>;

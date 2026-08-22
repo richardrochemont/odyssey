@@ -82,6 +82,13 @@ const NAV_PILLARS: NavPillar[] = [
     roles: ["owner", "manager", "accountant", "maintenance", "read_only"],
     matchPaths: ["/tasks"],
   },
+  {
+    type: "link",
+    name: "Growth",
+    href: "/growth",
+    roles: ["owner", "manager", "read_only"],
+    matchPaths: ["/growth"],
+  },
 ];
 
 // "/" only matches the exact root path so it never swallows every route.
